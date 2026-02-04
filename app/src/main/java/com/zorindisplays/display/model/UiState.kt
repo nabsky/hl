@@ -21,6 +21,7 @@ sealed class UiState {
     ) : UiState()
 
     data class Lost(
+        val lastAmount: Long,
         val cards: List<Card>,
         val revealedCount: Int
     ) : UiState()

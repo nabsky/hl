@@ -1,8 +1,11 @@
 package com.zorindisplays.display.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicText
@@ -97,7 +100,7 @@ fun MainScreen(
                     is UiState.Ready -> st.amount
                     is UiState.Playing -> st.amount
                     is UiState.Won -> st.amount
-                    is UiState.Lost -> null
+                    is UiState.Lost -> st.lastAmount
                     else -> null
                 }
 
@@ -163,18 +166,38 @@ private fun RoundView(
     bottomText: String,
     imageLoader: ImageLoader
 ) {
+    val isLoseScreen = bottomText == "BETTER LUCK NEXT TIME!"
+
+    var showAmount by remember { mutableStateOf(true) }
+
+    LaunchedEffect(isLoseScreen) {
+        if (isLoseScreen) {
+            showAmount = true
+            kotlinx.coroutines.delay(1000)
+            showAmount = false
+        } else {
+            showAmount = true
+        }
+    }
+
     Box(Modifier.fillMaxSize()) {
 
-        if (amount != null) {
+        if (showAmount && amount != null) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 24.dp)
             ) {
-                BasicText(
-                    text = formatAmount(amount),
-                    style = DefaultTextStyle.copy(fontSize = 42.sp)
-                )
+                AnimatedVisibility(
+                    visible = showAmount && amount != null,
+                    enter = fadeIn(),
+                    exit = fadeOut(animationSpec = tween(400))
+                ) {
+                    BasicText(
+                        text = formatAmount(amount ?: 0L),
+                        style = DefaultTextStyle.copy(fontSize = 42.sp)
+                    )
+                }
             }
         }
 

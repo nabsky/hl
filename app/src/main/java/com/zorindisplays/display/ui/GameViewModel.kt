@@ -112,7 +112,11 @@ class GameViewModel : ViewModel() {
             CompareResult.HIGHER, CompareResult.LOWER -> {
                 val correct = HiLoEngine.isCorrect(guess, prev, next)
                 if (!correct) {
-                    _state.value = UiState.Lost(cards = st.cards, revealedCount = st.revealedCount + 1)
+                    _state.value = UiState.Lost(
+                        lastAmount = st.amount,
+                        cards = st.cards,
+                        revealedCount = st.revealedCount + 1
+                    )
                 } else {
                     val doubled = st.amount * 2L
                     val newRevealed = st.revealedCount + 1
