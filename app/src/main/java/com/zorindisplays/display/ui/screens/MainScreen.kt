@@ -128,8 +128,11 @@ fun MainScreen(
 private fun IdleView() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         BasicText(
-            text = "Guess whether the next card will be higher or lower to increase your prize",
-            style = DefaultTextStyle
+            text = "GUESS HIGHER OR LOWER\nAND DOUBLE YOUR PRIZE",
+            style = DefaultTextStyle.copy(
+                fontSize = 48.sp,
+                textAlign = TextAlign.Center
+            )
         )
     }
 }
@@ -144,15 +147,18 @@ private fun AmountEntryView(raw: String) {
         ) {
             BasicText(
                 text = formatAmount(raw.toLongOrNull() ?: 0L),
-                style = DefaultTextStyle.copy(fontSize = 36.sp)
+                style = DefaultTextStyle.copy(fontSize = 96.sp)
             )
 
         }
 
         Box(Modifier.align(Alignment.Center)) {
             BasicText(
-                text = "Type prize amount, press Enter",
-                style = DefaultTextStyle
+                text = "LOADING THE PRIZE\nPLEASE WAIT",
+                style = DefaultTextStyle.copy(
+                    fontSize = 36.sp,
+                    textAlign = TextAlign.Center
+                )
             )
         }
     }
@@ -195,7 +201,7 @@ private fun RoundView(
                 ) {
                     BasicText(
                         text = formatAmount(amount ?: 0L),
-                        style = DefaultTextStyle.copy(fontSize = 42.sp)
+                        style = DefaultTextStyle.copy(fontSize = 96.sp)
                     )
                 }
             }
@@ -228,7 +234,7 @@ private fun RoundView(
         ) {
             BasicText(
                 text = bottomText,
-                style = DefaultTextStyle.copy(fontSize = 28.sp, textAlign = TextAlign.Center)
+                style = DefaultTextStyle.copy(fontSize = 36.sp, textAlign = TextAlign.Center)
             )
         }
     }
