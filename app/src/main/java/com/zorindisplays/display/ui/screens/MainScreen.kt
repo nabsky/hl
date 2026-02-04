@@ -1,5 +1,8 @@
 package com.zorindisplays.display.ui.screens
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicText
@@ -24,6 +27,7 @@ import coil3.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.graphicsLayer
 import com.zorindisplays.display.model.Card
 import com.zorindisplays.display.model.cardBackAssetUrl
 
@@ -65,45 +69,54 @@ fun MainScreen(
                 }
             }
     ) {
-        when (val st = state) {
+        val st = state
+        when (st) {
             UiState.Idle -> IdleView()
 
             is UiState.AmountEntry -> AmountEntryView(raw = st.raw)
 
-            is UiState.Ready -> ReadyView(
-                amount = st.amount,
-                cards = st.cards,
-                revealedCount = 0,
-                bottomText = "PRESS START TO BEGIN",
-                imageLoader = imageLoader
-            )
+            else -> {
+                // сюда попадут Ready / Playing / Lost / Won
+                val cards = when (st) {
+                    is UiState.Ready -> st.cards
+                    is UiState.Playing -> st.cards
+                    is UiState.Lost -> st.cards
+                    is UiState.Won -> st.cards
+                    else -> emptyList()
+                }
 
-            is UiState.Playing -> {
-                val bottom = if (st.awaitingGuess) "HIGHER OR LOWER" else ""
-                ReadyView(
-                    amount = st.amount,
-                    cards = st.cards,
-                    revealedCount = st.revealedCount,
-                    bottomText = bottom,
+                val revealedCount = when (st) {
+                    is UiState.Ready -> 0
+                    is UiState.Playing -> st.revealedCount
+                    is UiState.Lost -> st.revealedCount
+                    is UiState.Won -> 5
+                    else -> 0
+                }
+
+                val amount: Long? = when (st) {
+                    is UiState.Ready -> st.amount
+                    is UiState.Playing -> st.amount
+                    is UiState.Won -> st.amount
+                    is UiState.Lost -> null
+                    else -> null
+                }
+
+                val bottomText = when (st) {
+                    is UiState.Ready -> "PRESS START TO BEGIN"
+                    is UiState.Playing -> if (st.awaitingGuess) "HIGHER OR LOWER" else ""
+                    is UiState.Lost -> "BETTER LUCK NEXT TIME!"
+                    is UiState.Won -> "YOU WON!"
+                    else -> ""
+                }
+
+                RoundView(
+                    amount = amount,
+                    cards = cards,
+                    revealedCount = revealedCount,
+                    bottomText = bottomText,
                     imageLoader = imageLoader
                 )
             }
-
-            is UiState.Lost -> ReadyView(
-                amount = null,
-                cards = st.cards,
-                revealedCount = st.revealedCount,
-                bottomText = "BETTER LUCK NEXT TIME!",
-                imageLoader = imageLoader
-            )
-
-            is UiState.Won -> ReadyView(
-                amount = st.amount,
-                cards = st.cards,
-                revealedCount = 5,
-                bottomText = "YOU WON!",
-                imageLoader = imageLoader
-            )
         }
     }
 }
@@ -143,7 +156,7 @@ private fun AmountEntryView(raw: String) {
 }
 
 @Composable
-private fun ReadyView(
+private fun RoundView(
     amount: Long?,
     cards: List<Card>,
     revealedCount: Int,
@@ -169,19 +182,21 @@ private fun ReadyView(
             modifier = Modifier
                 .align(Alignment.Center)
                 .padding(horizontal = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             repeat(5) { i ->
                 val faceUp = i < revealedCount
-                CardImage(
+                FlipCard(
                     imageLoader = imageLoader,
                     faceUp = faceUp,
-                    card = cards.getOrNull(i)
+                    card = cards.getOrNull(i),
+                    modifier = Modifier
+                        .width(180.dp)
+                        .height(260.dp)
                 )
             }
         }
-
 
         Box(
             modifier = Modifier
@@ -190,34 +205,61 @@ private fun ReadyView(
         ) {
             BasicText(
                 text = bottomText,
-                style = DefaultTextStyle.copy(
-                    fontSize = 28.sp,
-                    textAlign = TextAlign.Center
-                )
+                style = DefaultTextStyle.copy(fontSize = 28.sp, textAlign = TextAlign.Center)
             )
         }
     }
 }
 
 @Composable
-private fun CardImage(
+private fun FlipCard(
     imageLoader: ImageLoader,
     faceUp: Boolean,
     card: Card?,
+    modifier: Modifier = Modifier
 ) {
-    val url = if (faceUp && card != null) card.assetUrl() else cardBackAssetUrl()
+    val rotation = remember { Animatable(0f) }
+    var shownFaceUp by remember { mutableStateOf(faceUp) } // какая сторона сейчас реально показывается
 
-    AsyncImage(
-        model = url,
-        imageLoader = imageLoader,
-        contentDescription = null,
-        modifier = Modifier
-            .width(90.dp)
-            .height(130.dp)
-            .clip(RoundedCornerShape(10.dp)),
-        contentScale = ContentScale.Fit
-    )
+    LaunchedEffect(faceUp) {
+        if (shownFaceUp == faceUp) return@LaunchedEffect
+
+        // 1) 0 -> 90 (половина времени)
+        rotation.animateTo(
+            targetValue = 90f,
+            animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+        )
+
+        // 2) на ребре переключаем сторону
+        shownFaceUp = faceUp
+
+        // 3) прыжок на -90, чтобы продолжить "раскрытие"
+        rotation.snapTo(-90f)
+
+        // 4) -90 -> 0 (вторая половина времени)
+        rotation.animateTo(
+            targetValue = 0f,
+            animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+        )
+    }
+
+    val url = if (shownFaceUp && card != null) card.assetUrl() else cardBackAssetUrl()
+
+    Box(
+        modifier = modifier.graphicsLayer {
+            rotationY = rotation.value
+            cameraDistance = 24f * density
+        }
+    ) {
+        AsyncImage(
+            model = url,
+            imageLoader = imageLoader,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
 }
+
 
 private fun formatAmount(v: Long): String {
     val nf = NumberFormat.getIntegerInstance()
