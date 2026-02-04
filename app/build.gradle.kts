@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.zorindisplays.display"
-    compileSdk = 33
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.zorindisplays.display"
@@ -45,6 +45,10 @@ dependencies {
     implementation(libs.activity.compose)
     implementation(libs.lottie.compose)
     implementation(libs.emoji2)
+    implementation(libs.lifecycle.viewmodel.compose)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.svg)
+
     debugImplementation(libs.ui.tooling)
 }
 
