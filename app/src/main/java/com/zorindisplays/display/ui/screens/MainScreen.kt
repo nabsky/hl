@@ -147,7 +147,7 @@ private fun AmountEntryView(raw: String) {
         ) {
             BasicText(
                 text = formatAmount(raw.toLongOrNull() ?: 0L),
-                style = DefaultTextStyle.copy(fontSize = 96.sp)
+                style = DefaultTextStyle.copy(fontSize = 72.sp)
             )
 
         }
@@ -201,7 +201,7 @@ private fun RoundView(
                 ) {
                     BasicText(
                         text = formatAmount(amount ?: 0L),
-                        style = DefaultTextStyle.copy(fontSize = 96.sp)
+                        style = DefaultTextStyle.copy(fontSize = 72.sp)
                     )
                 }
             }
@@ -292,5 +292,5 @@ private fun FlipCard(
 
 private fun formatAmount(v: Long): String {
     val nf = NumberFormat.getIntegerInstance()
-    return nf.format(v)
+    return nf.format(v) + " CFA"
 }
