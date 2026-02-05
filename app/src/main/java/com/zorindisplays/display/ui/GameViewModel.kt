@@ -6,6 +6,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
 class GameViewModel : ViewModel() {
 
     private val _state = MutableStateFlow<UiState>(UiState.Idle)
@@ -13,6 +18,8 @@ class GameViewModel : ViewModel() {
 
     // блокируем ввод на время анимаций (пока без корутин-анимаций, но флаг уже есть)
     private var inputLocked: Boolean = false
+
+    private var confettiJob: Job? = null
 
     fun onDigit(d: Int) {
         if (inputLocked) return
@@ -118,14 +125,34 @@ class GameViewModel : ViewModel() {
                         revealedCount = st.revealedCount + 1
                     )
                 } else {
+                    triggerConfetti()
                     val doubled = st.amount * 2L
                     val newRevealed = st.revealedCount + 1
                     if (newRevealed >= 5) {
                         _state.value = UiState.Won(amount = doubled, cards = st.cards)
                     } else {
-                        _state.value = st.copy(amount = doubled, revealedCount = newRevealed, awaitingGuess = true)
+                        _state.value = st.copy(
+                            amount = doubled,
+                            revealedCount = newRevealed,
+                            awaitingGuess = true,
+                            showConfetti = true // важно: чтобы включилось сразу
+                        )
                     }
                 }
+
+            }
+        }
+    }
+
+    private fun triggerConfetti() {
+        confettiJob?.cancel()
+        _state.update { st ->
+            if (st is UiState.Playing) st.copy(showConfetti = true) else st
+        }
+        confettiJob = viewModelScope.launch {
+            delay(1200) // длительность показа, подгони как нравится
+            _state.update { st ->
+                if (st is UiState.Playing) st.copy(showConfetti = false) else st
             }
         }
     }

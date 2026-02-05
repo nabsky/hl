@@ -17,7 +17,8 @@ sealed class UiState {
         val amount: Long,
         val cards: List<Card>,
         val revealedCount: Int, // 1..5
-        val awaitingGuess: Boolean
+        val awaitingGuess: Boolean,
+        val showConfetti: Boolean = false
     ) : UiState()
 
     data class Lost(

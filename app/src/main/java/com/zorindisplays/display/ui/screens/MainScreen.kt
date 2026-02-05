@@ -33,6 +33,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.graphicsLayer
 import com.zorindisplays.display.model.Card
 import com.zorindisplays.display.model.cardBackAssetUrl
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.zIndex
+import com.airbnb.lottie.compose.*
+import com.zorindisplays.display.R
 
 @Composable
 fun MainScreen(
@@ -120,6 +124,24 @@ fun MainScreen(
                     imageLoader = imageLoader
                 )
             }
+        }
+        val showConfetti = (state as? UiState.Playing)?.showConfetti == true
+
+        if (showConfetti) {
+            val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.fireworks))
+            val progress by animateLottieCompositionAsState(
+                composition = composition,
+                iterations = 1,
+                isPlaying = true
+            )
+
+            LottieAnimation(
+                composition = composition,
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .zIndex(999f)
+            )
         }
     }
 }
