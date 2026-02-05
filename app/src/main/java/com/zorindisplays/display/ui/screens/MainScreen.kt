@@ -39,6 +39,10 @@ import androidx.compose.ui.zIndex
 import com.airbnb.lottie.compose.*
 import com.zorindisplays.display.R
 import com.zorindisplays.display.ui.KonfettiOverlay
+import com.zorindisplays.display.ui.components.GoldShineText
+import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
+import kotlin.getValue
 
 
 @Composable
@@ -190,11 +194,11 @@ private fun AmountEntryView(raw: String) {
                 .align(Alignment.TopCenter)
                 .padding(top = 24.dp)
         ) {
-            BasicText(
+            GoldShineText(
                 text = formatAmount(raw.toLongOrNull() ?: 0L),
-                style = DefaultTextStyle.copy(fontSize = 72.sp)
+                fontSize = 120.sp,
+                strokeWidth = 14f
             )
-
         }
 
         Box(Modifier.align(Alignment.Center)) {
@@ -244,9 +248,10 @@ private fun RoundView(
                     enter = fadeIn(),
                     exit = fadeOut(animationSpec = tween(400))
                 ) {
-                    BasicText(
+                    GoldShineText(
                         text = formatAmount(amount ?: 0L),
-                        style = DefaultTextStyle.copy(fontSize = 72.sp)
+                        fontSize = 120.sp,
+                        strokeWidth = 14f
                     )
                 }
             }
@@ -335,7 +340,13 @@ private fun FlipCard(
 }
 
 
+private val amountFormat by lazy {
+    val symbols = DecimalFormatSymbols().apply {
+        groupingSeparator = '\u00A0' // неразрывный пробел
+    }
+    DecimalFormat("#,###", symbols)
+}
+
 private fun formatAmount(v: Long): String {
-    val nf = NumberFormat.getIntegerInstance()
-    return nf.format(v) + " CFA"
+    return amountFormat.format(v) + "\u00A0CFA"
 }
