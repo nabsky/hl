@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.zIndex
 import com.zorindisplays.display.model.UiState
 import com.zorindisplays.display.ui.GameViewModel
 import com.zorindisplays.display.ui.buildSvgImageLoader
@@ -29,13 +30,26 @@ fun App(
         UiState.Idle -> R.drawable.bg_00
         is UiState.Playing -> when ((state as UiState.Playing).revealedCount) {
             1 -> R.drawable.bg_01
-            2 -> R.drawable.bg_02
-            3 -> R.drawable.bg_03
-            4 -> R.drawable.bg_04
-            else -> R.drawable.bg_05
+            2 -> R.drawable.bg_01
+            3 -> R.drawable.bg_01
+            4 -> R.drawable.bg_01
+            else -> R.drawable.bg_01
         }
-        is UiState.Won -> R.drawable.bg_05
+        is UiState.Won -> R.drawable.bg_01
         else -> R.drawable.bg_01
+    }
+
+    val fgRes = when (state) {
+        UiState.Idle -> null
+        is UiState.Playing -> when ((state as UiState.Playing).revealedCount) {
+            1 -> null
+            2 -> R.drawable.fg_02
+            3 -> R.drawable.fg_03
+            4 -> R.drawable.fg_04
+            else -> R.drawable.fg_05
+        }
+        is UiState.Won -> R.drawable.fg_05
+        else -> null
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -51,5 +65,16 @@ fun App(
             imageLoader = imageLoader,
             vm = vm
         )
+
+        if(fgRes != null) {
+            Image(
+                painter = painterResource(fgRes),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(1f),
+                contentScale = ContentScale.Crop
+            )
+        }
     }
 }
