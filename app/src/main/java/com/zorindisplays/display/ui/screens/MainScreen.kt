@@ -39,6 +39,7 @@ import androidx.compose.ui.zIndex
 import com.airbnb.lottie.compose.*
 import com.zorindisplays.display.R
 import com.zorindisplays.display.ui.KonfettiOverlay
+import com.zorindisplays.display.ui.components.AnimatedAmountText
 import com.zorindisplays.display.ui.components.GoldShineText
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
@@ -248,10 +249,12 @@ private fun RoundView(
                     enter = fadeIn(),
                     exit = fadeOut(animationSpec = tween(400))
                 ) {
-                    GoldShineText(
-                        text = formatAmount(amount ?: 0L),
+                    AnimatedAmountText(
+                        targetAmount = amount,
+                        format = ::formatAmount,
                         fontSize = 120.sp,
-                        strokeWidth = 14f
+                        strokeWidth = 12f,
+                        animateOnFirst = false
                     )
                 }
             }
