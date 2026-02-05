@@ -34,9 +34,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import com.zorindisplays.display.model.Card
 import com.zorindisplays.display.model.cardBackAssetUrl
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.zIndex
 import com.airbnb.lottie.compose.*
 import com.zorindisplays.display.R
+import com.zorindisplays.display.ui.KonfettiOverlay
+
 
 @Composable
 fun MainScreen(
@@ -125,23 +128,43 @@ fun MainScreen(
                 )
             }
         }
-        val showConfetti = (state as? UiState.Playing)?.showConfetti == true
+        val playing = state as? UiState.Playing
+        val showConfetti = playing?.showConfetti == true
+        val confettiTick = playing?.confettiTick ?: 0
 
         if (showConfetti) {
-            val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.fireworks))
+            key(confettiTick) {
+                KonfettiOverlay(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(999f)
+                )
+            }
+        }
+        val isWon = state is UiState.Won
+
+        if (isWon) {
+            val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.winner))
             val progress by animateLottieCompositionAsState(
                 composition = composition,
                 iterations = 1,
                 isPlaying = true
             )
 
-            LottieAnimation(
-                composition = composition,
-                progress = { progress },
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .zIndex(999f)
-            )
+                    .fillMaxSize()
+                    .zIndex(1000f),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                LottieAnimation(
+                    composition = composition,
+                    progress = { progress },
+                    modifier = Modifier
+                        .scale(4f)
+                        .padding(bottom = 60.dp)  // отступ снизу
+                )
+            }
         }
     }
 }

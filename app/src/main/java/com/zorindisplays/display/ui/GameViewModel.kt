@@ -1,5 +1,6 @@
 package com.zorindisplays.display.ui
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import com.zorindisplays.display.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,6 +11,8 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+private const val TAG = "HiLoGame"
 
 class GameViewModel : ViewModel() {
 
@@ -79,7 +82,8 @@ class GameViewModel : ViewModel() {
         _state.update { st ->
             when (st) {
                 is UiState.Ready -> {
-                    // первая карта открывается
+                    logCards(st.cards)
+
                     UiState.Playing(
                         amount = st.amount,
                         cards = st.cards,
@@ -125,35 +129,45 @@ class GameViewModel : ViewModel() {
                         revealedCount = st.revealedCount + 1
                     )
                 } else {
-                    triggerConfetti()
+                    // правильный ответ
                     val doubled = st.amount * 2L
                     val newRevealed = st.revealedCount + 1
+
                     if (newRevealed >= 5) {
                         _state.value = UiState.Won(amount = doubled, cards = st.cards)
                     } else {
-                        _state.value = st.copy(
-                            amount = doubled,
-                            revealedCount = newRevealed,
-                            awaitingGuess = true,
-                            showConfetti = true // важно: чтобы включилось сразу
-                        )
+                        _state.update { cur ->
+                            val p = cur as? UiState.Playing ?: return@update cur
+                            p.copy(
+                                amount = doubled,
+                                revealedCount = newRevealed,
+                                awaitingGuess = true,
+                                showConfetti = true,
+                                confettiTick = p.confettiTick + 1
+                            )
+                        }
+                        scheduleConfettiOff()
                     }
                 }
-
             }
         }
     }
 
-    private fun triggerConfetti() {
+    private fun scheduleConfettiOff() {
         confettiJob?.cancel()
-        _state.update { st ->
-            if (st is UiState.Playing) st.copy(showConfetti = true) else st
-        }
         confettiJob = viewModelScope.launch {
-            delay(1200) // длительность показа, подгони как нравится
+            delay(1200)
             _state.update { st ->
                 if (st is UiState.Playing) st.copy(showConfetti = false) else st
             }
         }
     }
+
+    private fun logCards(cards: List<Card>) {
+        Log.d(TAG, "HiLo Round started")
+        cards.forEachIndexed { index, card ->
+            Log.d(TAG, "[${index + 1}] ${card.rank.label}${card.suit.symbol}")
+        }
+    }
+
 }
