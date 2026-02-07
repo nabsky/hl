@@ -1,9 +1,11 @@
 package com.zorindisplays.display
 
+import android.media.MediaPlayer
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -75,6 +77,30 @@ fun App(
                     .zIndex(1f),
                 contentScale = ContentScale.Crop
             )
+        }
+    }
+
+    // Воспроизведение coins.wav при playCoinSound
+    if (state is UiState.Playing && (state as UiState.Playing).playCoinSound) {
+        LaunchedEffect((state as UiState.Playing).confettiTick) {
+            MediaPlayer.create(context, R.raw.coins).apply {
+                setOnCompletionListener { release() }
+                start()
+            }
+            // Сбросить playCoinSound после воспроизведения
+            vm.onCoinSoundPlayed()
+        }
+    }
+
+    // Воспроизведение winner.wav при playWinnerSound
+    if (state is UiState.Won && (state as UiState.Won).playWinnerSound) {
+        LaunchedEffect((state as UiState.Won).amount) {
+            MediaPlayer.create(context, R.raw.win).apply {
+                setOnCompletionListener { release() }
+                start()
+            }
+            // Сбросить playWinnerSound после воспроизведения
+            vm.onWinnerSoundPlayed()
         }
     }
 }

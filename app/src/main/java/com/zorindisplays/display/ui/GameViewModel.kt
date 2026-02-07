@@ -115,7 +115,7 @@ class GameViewModel : ViewModel() {
                 // просто открываем следующую карту, сумма без изменений
                 val newRevealed = st.revealedCount + 1
                 if (newRevealed >= 5) {
-                    _state.value = UiState.Won(amount = st.amount, cards = st.cards)
+                    _state.value = UiState.Won(amount = st.amount, cards = st.cards, playWinnerSound = true)
                 } else {
                     _state.value = st.copy(revealedCount = newRevealed, awaitingGuess = true)
                 }
@@ -134,7 +134,7 @@ class GameViewModel : ViewModel() {
                     val newRevealed = st.revealedCount + 1
 
                     if (newRevealed >= 5) {
-                        _state.value = UiState.Won(amount = doubled, cards = st.cards)
+                        _state.value = UiState.Won(amount = doubled, cards = st.cards, playWinnerSound = true)
                     } else {
                         _state.update { cur ->
                             val p = cur as? UiState.Playing ?: return@update cur
@@ -143,7 +143,8 @@ class GameViewModel : ViewModel() {
                                 revealedCount = newRevealed,
                                 awaitingGuess = true,
                                 showConfetti = true,
-                                confettiTick = p.confettiTick + 1
+                                confettiTick = p.confettiTick + 1,
+                                playCoinSound = true // добавить флаг для воспроизведения звука
                             )
                         }
                         scheduleConfettiOff()
@@ -167,6 +168,18 @@ class GameViewModel : ViewModel() {
         Log.d(TAG, "HiLo Round started")
         cards.forEachIndexed { index, card ->
             Log.d(TAG, "[${index + 1}] ${card.rank.label}${card.suit.symbol}")
+        }
+    }
+
+    fun onCoinSoundPlayed() {
+        _state.update { st ->
+            if (st is UiState.Playing && st.playCoinSound) st.copy(playCoinSound = false) else st
+        }
+    }
+
+    fun onWinnerSoundPlayed() {
+        _state.update { st ->
+            if (st is UiState.Won && st.playWinnerSound) st.copy(playWinnerSound = false) else st
         }
     }
 

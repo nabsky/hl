@@ -15,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.*
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -24,16 +23,11 @@ import com.zorindisplays.display.model.Guess
 import com.zorindisplays.display.model.UiState
 import com.zorindisplays.display.ui.GameViewModel
 import com.zorindisplays.display.ui.theme.DefaultTextStyle
-import java.text.NumberFormat
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.graphicsLayer
 import com.zorindisplays.display.model.Card
 import com.zorindisplays.display.model.cardBackAssetUrl
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.zIndex
 import com.airbnb.lottie.compose.*
