@@ -1,5 +1,7 @@
 package com.zorindisplays.display.ui.screens
 
+import android.media.MediaPlayer
+import android.media.AudioAttributes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -15,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -143,26 +146,61 @@ fun MainScreen(
         val isWon = state is UiState.Won
 
         if (isWon) {
-            val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.winner))
-            val progress by animateLottieCompositionAsState(
-                composition = composition,
-                iterations = 1,
-                isPlaying = true
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(1000f),
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                LottieAnimation(
+            var showLottie by remember { mutableStateOf(false) }
+            LaunchedEffect(isWon) {
+                showLottie = false
+                kotlinx.coroutines.delay(400)
+                showLottie = true
+            }
+            if (showLottie) {
+                val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.winner))
+                val progress by animateLottieCompositionAsState(
                     composition = composition,
-                    progress = { progress },
-                    modifier = Modifier
-                        .scale(4f)
-                        .padding(bottom = 60.dp)  // отступ снизу
+                    iterations = 1,
+                    isPlaying = true
                 )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(1000f),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    LottieAnimation(
+                        composition = composition,
+                        progress = { progress },
+                        modifier = Modifier
+                            .scale(4f)
+                            .padding(bottom = 60.dp)  // отступ снизу
+                    )
+                }
+            }
+        }
+
+        // Воспроизведение coins.wav через MediaPlayer
+        val playCoinSound = (state as? UiState.Playing)?.playCoinSound == true
+        val context = LocalContext.current
+        var coinsPlayer: MediaPlayer? by remember { mutableStateOf(null) }
+        LaunchedEffect(playCoinSound) {
+            if (playCoinSound) {
+                // Если уже проигрывается, не запускать повторно
+                if (coinsPlayer?.isPlaying == true) return@LaunchedEffect
+                coinsPlayer?.release()
+                coinsPlayer = MediaPlayer.create(context, R.raw.coins)
+                coinsPlayer?.setOnCompletionListener { mp -> mp.release(); coinsPlayer = null }
+                coinsPlayer?.start()
+                vm.onCoinSoundPlayed()
+            }
+        }
+
+        // Воспроизведение winner.wav через MediaPlayer
+        if (state is UiState.Won && (state as UiState.Won).playWinnerSound) {
+            LaunchedEffect((state as UiState.Won).amount) {
+                MediaPlayer.create(context, R.raw.win).apply {
+                    setOnCompletionListener { release() }
+                    start()
+                }
+                vm.onWinnerSoundPlayed()
             }
         }
     }
@@ -339,7 +377,7 @@ private fun FlipCard(
 
 private val amountFormat by lazy {
     val symbols = DecimalFormatSymbols().apply {
-        groupingSeparator = '\u00A0' // неразрывный пробел
+        groupingSeparator = '\u00A0' // неразрывной пробел
     }
     DecimalFormat("#,###", symbols)
 }
