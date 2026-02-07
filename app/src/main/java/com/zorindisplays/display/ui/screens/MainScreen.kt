@@ -239,7 +239,7 @@ private fun RoundView(
                     .padding(top = 24.dp)
             ) {
                 AnimatedVisibility(
-                    visible = showAmount && amount != null,
+                    visible = showAmount,
                     enter = fadeIn(),
                     exit = fadeOut(animationSpec = tween(400))
                 ) {
