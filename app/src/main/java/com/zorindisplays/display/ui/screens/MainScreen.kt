@@ -332,6 +332,7 @@ private fun FlipCard(
     card: Card?,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val rotation = remember { Animatable(0f) }
     var shownFaceUp by remember { mutableStateOf(faceUp) } // какая сторона сейчас реально показывается
 
@@ -343,6 +344,10 @@ private fun FlipCard(
             targetValue = 90f,
             animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
         )
+        MediaPlayer.create(context, R.raw.flick).apply {
+            setOnCompletionListener { release() }
+            start()
+        }
 
         // 2) на ребре переключаем сторону
         shownFaceUp = faceUp
