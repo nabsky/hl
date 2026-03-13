@@ -256,19 +256,15 @@ fun MainScreen(
                         }
 
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { tempDeckMode = DeckMode.FIXED_RTP },
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             RadioButton(
                                 selected = tempDeckMode == DeckMode.FIXED_RTP,
                                 onClick = { tempDeckMode = DeckMode.FIXED_RTP }
                             )
-                            Text("Fixed RTP")
-                        }
 
-                        if (tempDeckMode == DeckMode.FIXED_RTP) {
                             OutlinedTextField(
                                 value = tempRtpInput,
                                 onValueChange = { newValue ->
@@ -291,14 +287,25 @@ fun MainScreen(
                                         }
                                     }
                                 },
-                                label = { Text("RTP") },
+                                modifier = Modifier.width(110.dp),
                                 singleLine = true,
+                                label = { Text("Fixed RTP") },
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Decimal
-                                ),
-                                supportingText = {
-                                    Text("Example: 98.00")
-                                }
+                                )
+                            )
+
+                            val rtpValue = tempRtpInput.replace(',', '.').toDoubleOrNull()?.coerceIn(0.0, 100.0) ?: 0.0
+                            val winChancePercent = rtpValue / 16.0
+                            val oneIn = if (winChancePercent > 0.0) 100.0 / winChancePercent else null
+
+                            Text(
+                                text = if (oneIn != null) {
+                                    "Win: ${"%.2f".format(winChancePercent)}% (~1 in ${"%.2f".format(oneIn)})"
+                                } else {
+                                    "Win: 0.00%"
+                                },
+                                modifier = Modifier.weight(1f)
                             )
                         }
                     }
