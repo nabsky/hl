@@ -13,7 +13,7 @@ android {
         minSdk = 24
         targetSdk = 33
         versionCode = 1
-        versionName = "1.0"
+        versionName = "260313"
     }
 
     buildTypes {
@@ -50,6 +50,8 @@ dependencies {
     implementation(libs.coil.svg)
     implementation(libs.konfetti.compose)
     implementation(libs.androidx.compose.material3)
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("androidx.core:core-ktx:1.13.1")
 
     debugImplementation(libs.ui.tooling)
 }

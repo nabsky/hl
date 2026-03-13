@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import com.zorindisplays.display.ui.theme.Bangers
+import com.zorindisplays.display.ui.theme.Chango
 
 @Composable
 fun GoldShineText(
@@ -64,7 +65,7 @@ fun GoldShineText(
         fontSize = fontSize,
         fontWeight = FontWeight.Black,
         textAlign = textAlign,
-        fontFamily = Bangers
+        fontFamily = Chango
     )
 
     Box(modifier = modifier) {

@@ -1,6 +1,5 @@
 package com.zorindisplays.display.ui.screens
 
-import android.media.AudioAttributes
 import android.media.MediaPlayer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -51,7 +50,9 @@ import com.zorindisplays.display.ui.theme.DefaultTextStyle
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.util.Locale
-import kotlin.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.zorindisplays.display.util.ApkUpdater
 
 @Composable
 fun MainScreen(
@@ -72,6 +73,23 @@ fun MainScreen(
 
     val context = LocalContext.current
 
+    val scope = rememberCoroutineScope()
+    val updater = remember { ApkUpdater(context) }
+
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    var updateCode by remember { mutableStateOf("") }
+    var updateStatus by remember { mutableStateOf("") }
+    var updateProgress by remember { mutableStateOf(0) }
+    var updateInProgress by remember { mutableStateOf(false) }
+
+    val versionName = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unknown"
+        } catch (_: Exception) {
+            "unknown"
+        }
+    }
+
     LaunchedEffect(Unit) {
         vm.loadSettings(context)
     }
@@ -91,6 +109,7 @@ fun MainScreen(
                     Key.H -> { vm.onGuess(Guess.HIGHER); true }
                     Key.L -> { vm.onGuess(Guess.LOWER); true }
                     Key.R -> { showDeckModeDialog = true; true }
+                    Key.U -> { showUpdateDialog = true; true }
 
                     Key.Zero, Key.NumPad0 -> { vm.onDigit(0); true }
                     Key.One, Key.NumPad1 -> { vm.onDigit(1); true }
@@ -348,6 +367,106 @@ fun MainScreen(
                 }
             )
         }
+
+        if (showUpdateDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    if (!updateInProgress) {
+                        showUpdateDialog = false
+                        updateStatus = ""
+                        updateProgress = 0
+                    }
+                },
+                title = {
+                    Text("Software Update")
+                },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text("Current version: $versionName")
+
+                        OutlinedTextField(
+                            value = updateCode,
+                            onValueChange = {
+                                updateCode = it.filter { ch -> ch.isDigit() }
+                                updateStatus = ""
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Update code") },
+                            singleLine = true,
+                            enabled = !updateInProgress,
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Number
+                            )
+                        )
+
+                        if (updateInProgress) {
+                            Text("Downloading: $updateProgress%")
+                        }
+
+                        if (updateStatus.isNotEmpty()) {
+                            Text(updateStatus)
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        enabled = !updateInProgress,
+                        onClick = {
+                            val code = updateCode.trim()
+                            if (code.isEmpty()) {
+                                updateStatus = "Enter code"
+                                return@Button
+                            }
+
+                            scope.launch {
+                                try {
+                                    updateInProgress = true
+                                    updateProgress = 0
+                                    updateStatus = "Preparing update..."
+
+                                    val url = "https://nabsky.bitbucket.io/higherlower/$code.apk"
+
+                                    updater.downloadAndInstall(
+                                        url = url,
+                                        fileName = "higherlower_update.apk",
+                                        onProgress = { percent ->
+                                            updateProgress = percent
+                                        }
+                                    )
+
+                                    updateStatus = "Starting install..."
+                                    showUpdateDialog = false
+                                    updateStatus = ""
+                                    updateProgress = 0
+                                    updateCode = ""
+                                } catch (t: Throwable) {
+                                    updateStatus = t.message ?: "Update failed"
+                                } finally {
+                                    updateInProgress = false
+                                }
+                            }
+                        }
+                    ) {
+                        Text("Update")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        enabled = !updateInProgress,
+                        onClick = {
+                            showUpdateDialog = false
+                            updateStatus = ""
+                            updateProgress = 0
+                        }
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -374,7 +493,7 @@ private fun AmountEntryView(raw: String) {
         ) {
             GoldShineText(
                 text = formatAmount(raw.toLongOrNull() ?: 0L),
-                fontSize = 120.sp,
+                fontSize = 72.sp,
                 strokeWidth = 14f
             )
         }
@@ -428,7 +547,7 @@ private fun RoundView(
                     AnimatedAmountText(
                         targetAmount = amount,
                         format = ::formatAmount,
-                        fontSize = 120.sp,
+                        fontSize = 72.sp,
                         strokeWidth = 12f,
                         animateOnFirst = false
                     )

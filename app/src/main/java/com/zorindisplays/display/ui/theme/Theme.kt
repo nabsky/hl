@@ -19,15 +19,12 @@ val MontserratBold = FontFamily(
 val Bangers = FontFamily(
     Font(R.font.bangers)
 )
+val Chango = FontFamily(
+    Font(R.font.chango_regular)
+)
 
 // Text styles
 val DefaultTextStyle = TextStyle(
-    fontFamily = MontserratBold,
-    fontSize = 24.sp,
-    color = PrimaryTextColor
-)
-
-val BangersTextStyle = TextStyle(
     fontFamily = MontserratBold,
     fontSize = 24.sp,
     color = PrimaryTextColor
