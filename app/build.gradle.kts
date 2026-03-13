@@ -49,6 +49,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.svg)
     implementation(libs.konfetti.compose)
+    implementation(libs.androidx.compose.material3)
 
     debugImplementation(libs.ui.tooling)
 }

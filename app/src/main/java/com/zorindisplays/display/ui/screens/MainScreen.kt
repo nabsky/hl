@@ -1,47 +1,57 @@
 package com.zorindisplays.display.ui.screens
 
-import android.media.MediaPlayer
 import android.media.AudioAttributes
+import android.media.MediaPlayer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.zorindisplays.display.model.Guess
-import com.zorindisplays.display.model.UiState
-import com.zorindisplays.display.ui.GameViewModel
-import com.zorindisplays.display.ui.theme.DefaultTextStyle
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
-import androidx.compose.ui.graphics.graphicsLayer
-import com.zorindisplays.display.model.Card
-import com.zorindisplays.display.model.cardBackAssetUrl
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.zIndex
 import com.airbnb.lottie.compose.*
 import com.zorindisplays.display.R
+import com.zorindisplays.display.model.Card
+import com.zorindisplays.display.model.Guess
+import com.zorindisplays.display.model.UiState
+import com.zorindisplays.display.model.cardBackAssetUrl
+import com.zorindisplays.display.ui.DeckMode
+import com.zorindisplays.display.ui.GameViewModel
 import com.zorindisplays.display.ui.KonfettiOverlay
 import com.zorindisplays.display.ui.components.AnimatedAmountText
 import com.zorindisplays.display.ui.components.GoldShineText
+import com.zorindisplays.display.ui.theme.DefaultTextStyle
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
+import java.util.Locale
 import kotlin.getValue
-
 
 @Composable
 fun MainScreen(
@@ -49,9 +59,21 @@ fun MainScreen(
     vm: GameViewModel = viewModel()
 ) {
     val state by vm.state.collectAsState()
+    val deckMode by vm.deckMode.collectAsState()
+    val fixedRtpInput by vm.fixedRtpInput.collectAsState()
+
+    var showDeckModeDialog by remember { mutableStateOf(false) }
+    var tempDeckMode by remember(showDeckModeDialog, deckMode) { mutableStateOf(deckMode) }
+    var tempRtpInput by remember(showDeckModeDialog, fixedRtpInput) { mutableStateOf(fixedRtpInput) }
 
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        vm.loadSettings(context)
+    }
 
     Box(
         modifier = Modifier
@@ -67,6 +89,8 @@ fun MainScreen(
                     Key.S -> { vm.onStart(); true }
                     Key.H -> { vm.onGuess(Guess.HIGHER); true }
                     Key.L -> { vm.onGuess(Guess.LOWER); true }
+                    Key.R -> { showDeckModeDialog = true; true }
+
                     Key.Zero, Key.NumPad0 -> { vm.onDigit(0); true }
                     Key.One, Key.NumPad1 -> { vm.onDigit(1); true }
                     Key.Two, Key.NumPad2 -> { vm.onDigit(2); true }
@@ -77,18 +101,17 @@ fun MainScreen(
                     Key.Seven, Key.NumPad7 -> { vm.onDigit(7); true }
                     Key.Eight, Key.NumPad8 -> { vm.onDigit(8); true }
                     Key.Nine, Key.NumPad9 -> { vm.onDigit(9); true }
+
                     else -> false
                 }
             }
     ) {
-        val st = state
-        when (st) {
+        when (val st = state) {
             UiState.Idle -> IdleView()
 
             is UiState.AmountEntry -> AmountEntryView(raw = st.raw)
 
             else -> {
-                // сюда попадут Ready / Playing / Lost / Won
                 val cards = when (st) {
                     is UiState.Ready -> st.cards
                     is UiState.Playing -> st.cards
@@ -130,6 +153,7 @@ fun MainScreen(
                 )
             }
         }
+
         val playing = state as? UiState.Playing
         val showConfetti = playing?.showConfetti == true
         val confettiTick = playing?.confettiTick ?: 0
@@ -143,17 +167,22 @@ fun MainScreen(
                 )
             }
         }
+
         val isWon = state is UiState.Won
 
         if (isWon) {
             var showLottie by remember { mutableStateOf(false) }
+
             LaunchedEffect(isWon) {
                 showLottie = false
                 kotlinx.coroutines.delay(400)
                 showLottie = true
             }
+
             if (showLottie) {
-                val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.winner))
+                val composition by rememberLottieComposition(
+                    LottieCompositionSpec.RawRes(R.raw.winner)
+                )
                 val progress by animateLottieCompositionAsState(
                     composition = composition,
                     iterations = 1,
@@ -171,29 +200,30 @@ fun MainScreen(
                         progress = { progress },
                         modifier = Modifier
                             .scale(4f)
-                            .padding(bottom = 60.dp)  // отступ снизу
+                            .padding(bottom = 60.dp)
                     )
                 }
             }
         }
 
-        // Воспроизведение coins.wav через MediaPlayer
         val playCoinSound = (state as? UiState.Playing)?.playCoinSound == true
         val context = LocalContext.current
         var coinsPlayer: MediaPlayer? by remember { mutableStateOf(null) }
+
         LaunchedEffect(playCoinSound) {
             if (playCoinSound) {
-                // Если уже проигрывается, не запускать повторно
                 if (coinsPlayer?.isPlaying == true) return@LaunchedEffect
                 coinsPlayer?.release()
                 coinsPlayer = MediaPlayer.create(context, R.raw.coins)
-                coinsPlayer?.setOnCompletionListener { mp -> mp.release(); coinsPlayer = null }
+                coinsPlayer?.setOnCompletionListener { mp ->
+                    mp.release()
+                    coinsPlayer = null
+                }
                 coinsPlayer?.start()
                 vm.onCoinSoundPlayed()
             }
         }
 
-        // Воспроизведение winner.wav через MediaPlayer
         if (state is UiState.Won && (state as UiState.Won).playWinnerSound) {
             LaunchedEffect((state as UiState.Won).amount) {
                 MediaPlayer.create(context, R.raw.win).apply {
@@ -202,6 +232,98 @@ fun MainScreen(
                 }
                 vm.onWinnerSoundPlayed()
             }
+        }
+
+        if (showDeckModeDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeckModeDialog = false },
+                title = {
+                    Text("Deck Mode")
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { tempDeckMode = DeckMode.RANDOM_DECK },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = tempDeckMode == DeckMode.RANDOM_DECK,
+                                onClick = { tempDeckMode = DeckMode.RANDOM_DECK }
+                            )
+                            Text("Random Deck")
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { tempDeckMode = DeckMode.FIXED_RTP },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = tempDeckMode == DeckMode.FIXED_RTP,
+                                onClick = { tempDeckMode = DeckMode.FIXED_RTP }
+                            )
+                            Text("Fixed RTP")
+                        }
+
+                        if (tempDeckMode == DeckMode.FIXED_RTP) {
+                            OutlinedTextField(
+                                value = tempRtpInput,
+                                onValueChange = { newValue ->
+                                    val normalized = newValue.replace(',', '.')
+                                    if (normalized.count { it == '.' } <= 1) {
+                                        val filtered = buildString {
+                                            normalized.forEach { ch ->
+                                                if (ch.isDigit() || ch == '.') append(ch)
+                                            }
+                                        }
+
+                                        val parts = filtered.split('.')
+                                        tempRtpInput = when {
+                                            parts.size == 1 -> parts[0].take(6)
+                                            else -> {
+                                                val intPart = parts[0].take(6)
+                                                val fracPart = parts[1].take(2)
+                                                "$intPart.$fracPart"
+                                            }
+                                        }
+                                    }
+                                },
+                                label = { Text("RTP") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Decimal
+                                ),
+                                supportingText = {
+                                    Text("Example: 98.00")
+                                }
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            vm.setDeckMode(tempDeckMode, context)
+                            if (tempDeckMode == DeckMode.FIXED_RTP) {
+                                vm.commitFixedRtp(tempRtpInput, context)
+                            }
+                            showDeckModeDialog = false
+                        }
+                    ) {
+                        Text("Save")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showDeckModeDialog = false }
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
     }
 }
@@ -269,7 +391,6 @@ private fun RoundView(
     }
 
     Box(Modifier.fillMaxSize()) {
-
         if (showAmount && amount != null) {
             Box(
                 modifier = Modifier
@@ -319,7 +440,10 @@ private fun RoundView(
         ) {
             BasicText(
                 text = bottomText,
-                style = DefaultTextStyle.copy(fontSize = 36.sp, textAlign = TextAlign.Center)
+                style = DefaultTextStyle.copy(
+                    fontSize = 36.sp,
+                    textAlign = TextAlign.Center
+                )
             )
         }
     }
@@ -334,28 +458,24 @@ private fun FlipCard(
 ) {
     val context = LocalContext.current
     val rotation = remember { Animatable(0f) }
-    var shownFaceUp by remember { mutableStateOf(faceUp) } // какая сторона сейчас реально показывается
+    var shownFaceUp by remember { mutableStateOf(faceUp) }
 
     LaunchedEffect(faceUp) {
         if (shownFaceUp == faceUp) return@LaunchedEffect
 
-        // 1) 0 -> 90 (половина времени)
         rotation.animateTo(
             targetValue = 90f,
             animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
         )
+
         MediaPlayer.create(context, R.raw.flick).apply {
             setOnCompletionListener { release() }
             start()
         }
 
-        // 2) на ребре переключаем сторону
         shownFaceUp = faceUp
-
-        // 3) прыжок на -90, чтобы продолжить "раскрытие"
         rotation.snapTo(-90f)
 
-        // 4) -90 -> 0 (вторая половина времени)
         rotation.animateTo(
             targetValue = 0f,
             animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
@@ -379,14 +499,9 @@ private fun FlipCard(
     }
 }
 
-
-private val amountFormat by lazy {
-    val symbols = DecimalFormatSymbols().apply {
-        groupingSeparator = '\u00A0' // неразрывной пробел
+private fun formatAmount(value: Long): String {
+    val symbols = DecimalFormatSymbols(Locale.US).apply {
+        groupingSeparator = ' '
     }
-    DecimalFormat("#,###", symbols)
-}
-
-private fun formatAmount(v: Long): String {
-    return amountFormat.format(v) + "\u00A0CFA"
+    return DecimalFormat("#,###", symbols).format(value)
 }
