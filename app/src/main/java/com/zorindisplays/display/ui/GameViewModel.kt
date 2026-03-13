@@ -25,9 +25,20 @@ enum class DeckMode {
     FIXED_RTP
 }
 
+data class GameStats(
+    val gamesCount: Long = 0,
+    val winsCount: Long = 0,
+    val totalIn: Long = 0,
+    val totalOut: Long = 0
+)
+
 private const val PREFS_NAME = "hilo_settings"
 private const val KEY_DECK_MODE = "deck_mode"
 private const val KEY_FIXED_RTP = "fixed_rtp"
+private const val KEY_GAMES_COUNT = "games_count"
+private const val KEY_WINS_COUNT = "wins_count"
+private const val KEY_TOTAL_IN = "total_in"
+private const val KEY_TOTAL_OUT = "total_out"
 
 class GameViewModel : ViewModel() {
 
@@ -40,19 +51,24 @@ class GameViewModel : ViewModel() {
     private val _fixedRtpInput = MutableStateFlow("98.00")
     val fixedRtpInput: StateFlow<String> = _fixedRtpInput
 
-    private var settingsLoaded = false
+    private val _stats = MutableStateFlow(GameStats())
+    val stats: StateFlow<GameStats> = _stats
 
-    // блокируем ввод на время анимаций
+    private var settingsLoaded = false
+    private var appContext: Context? = null
+
     private var inputLocked: Boolean = false
     private var confettiJob: Job? = null
 
-    // Fixed RTP round state
+    // Fixed RTP state
     private var fixedShouldWin: Boolean? = null
-    private var fixedLoseStep: Int = 4 // проиграть на каком угадывании: 2..4
+    private var fixedLoseStep: Int = 4
     private var fixedUsedCards: MutableSet<Card> = mutableSetOf()
 
     fun loadSettings(context: Context) {
         if (settingsLoaded) return
+
+        appContext = context.applicationContext
 
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -66,6 +82,14 @@ class GameViewModel : ViewModel() {
         }
 
         _fixedRtpInput.value = formatRtp(rtp)
+
+        _stats.value = GameStats(
+            gamesCount = prefs.getLong(KEY_GAMES_COUNT, 0L),
+            winsCount = prefs.getLong(KEY_WINS_COUNT, 0L),
+            totalIn = prefs.getLong(KEY_TOTAL_IN, 0L),
+            totalOut = prefs.getLong(KEY_TOTAL_OUT, 0L)
+        )
+
         settingsLoaded = true
     }
 
@@ -74,12 +98,28 @@ class GameViewModel : ViewModel() {
         prefs.edit()
             .putString(KEY_DECK_MODE, _deckMode.value.name)
             .putString(KEY_FIXED_RTP, _fixedRtpInput.value)
+            .putLong(KEY_GAMES_COUNT, _stats.value.gamesCount)
+            .putLong(KEY_WINS_COUNT, _stats.value.winsCount)
+            .putLong(KEY_TOTAL_IN, _stats.value.totalIn)
+            .putLong(KEY_TOTAL_OUT, _stats.value.totalOut)
             .apply()
     }
 
+    private fun saveSettingsIfPossible() {
+        appContext?.let { saveSettings(it) }
+    }
+
     fun setDeckMode(mode: DeckMode, context: Context? = null) {
+        if (context != null) appContext = context.applicationContext
+
+        val changed = _deckMode.value != mode
         _deckMode.value = mode
-        if (context != null) saveSettings(context)
+
+        if (changed) {
+            resetStats()
+        }
+
+        saveSettingsIfPossible()
     }
 
     fun setFixedRtpInput(value: String) {
@@ -106,8 +146,18 @@ class GameViewModel : ViewModel() {
     }
 
     fun commitFixedRtp(value: String, context: Context? = null) {
-        _fixedRtpInput.value = formatRtp(value)
-        if (context != null) saveSettings(context)
+        if (context != null) appContext = context.applicationContext
+
+        val formatted = formatRtp(value)
+        val changed = _fixedRtpInput.value != formatted
+
+        _fixedRtpInput.value = formatted
+
+        if (changed) {
+            resetStats()
+        }
+
+        saveSettingsIfPossible()
     }
 
     fun getFixedRtpOrDefault(): Double {
@@ -118,6 +168,31 @@ class GameViewModel : ViewModel() {
     private fun formatRtp(value: String): String {
         val parsed = value.replace(',', '.').toDoubleOrNull() ?: 98.0
         return String.format(Locale.US, "%.2f", parsed.coerceIn(0.00, 100.00))
+    }
+
+    private fun resetStats() {
+        _stats.value = GameStats()
+        saveSettingsIfPossible()
+    }
+
+    private fun recordGameStarted(amount: Long) {
+        _stats.update {
+            it.copy(
+                gamesCount = it.gamesCount + 1,
+                totalIn = it.totalIn + amount
+            )
+        }
+        saveSettingsIfPossible()
+    }
+
+    private fun recordGameWon(payout: Long) {
+        _stats.update {
+            it.copy(
+                winsCount = it.winsCount + 1,
+                totalOut = it.totalOut + payout
+            )
+        }
+        saveSettingsIfPossible()
     }
 
     fun onDigit(d: Int) {
@@ -199,6 +274,7 @@ class GameViewModel : ViewModel() {
             when (st) {
                 is UiState.Ready -> {
                     logCards(st.cards)
+                    recordGameStarted(st.amount)
 
                     UiState.Playing(
                         amount = st.amount,
@@ -249,7 +325,7 @@ class GameViewModel : ViewModel() {
         val newCards = st.cards.toMutableList()
 
         val next = when {
-            // 1-я догадка: карта №2 уже сгенерирована заранее случайно
+            // Первая догадка: 2-я карта уже заранее случайная
             nextIndex == 1 -> {
                 val existing = newCards[nextIndex]
                 fixedUsedCards.add(existing)
@@ -258,7 +334,7 @@ class GameViewModel : ViewModel() {
 
             else -> {
                 val shouldWinRound = fixedShouldWin ?: false
-                val currentGuessStep = nextIndex // 2..4 для карт 3..5
+                val currentGuessStep = nextIndex // 2..4
 
                 when {
                     shouldWinRound -> {
@@ -307,32 +383,6 @@ class GameViewModel : ViewModel() {
         )
     }
 
-    private fun drawRandomNonTieCardRelativeTo(
-        prev: Card,
-        exclude: Set<Card>
-    ): Card {
-        repeat(5000) {
-            val candidate = HiLoEngine.drawFiveCards().random()
-
-            if (candidate in exclude) return@repeat
-
-            when (HiLoEngine.compare(prev, candidate)) {
-                CompareResult.HIGHER, CompareResult.LOWER -> return candidate
-                CompareResult.TIE -> { }
-            }
-        }
-
-        repeat(5000) {
-            val candidate = HiLoEngine.drawFiveCards().random()
-            when (HiLoEngine.compare(prev, candidate)) {
-                CompareResult.HIGHER, CompareResult.LOWER -> return candidate
-                CompareResult.TIE -> { }
-            }
-        }
-
-        return HiLoEngine.drawFiveCards().first()
-    }
-
     private fun resolveGuess(
         st: UiState.Playing,
         guess: Guess,
@@ -346,6 +396,7 @@ class GameViewModel : ViewModel() {
             CompareResult.TIE -> {
                 val newRevealed = st.revealedCount + 1
                 if (newRevealed >= 5) {
+                    recordGameWon(st.amount)
                     _state.value = UiState.Won(
                         amount = st.amount,
                         cards = updatedCards,
@@ -373,6 +424,7 @@ class GameViewModel : ViewModel() {
                     val newRevealed = st.revealedCount + 1
 
                     if (newRevealed >= 5) {
+                        recordGameWon(doubled)
                         _state.value = UiState.Won(
                             amount = doubled,
                             cards = updatedCards,
@@ -402,8 +454,6 @@ class GameViewModel : ViewModel() {
         val winProbability = getFixedRtpOrDefault() / 1600.0
         fixedShouldWin = Random.nextDouble() < winProbability
 
-        // Первое угадывание всегда случайное.
-        // Контроль начинаем только с 3-й карты, значит проигрыш возможен на 2, 3 или 4-м угадывании.
         fixedLoseStep = if (fixedShouldWin == true) {
             4
         } else {
@@ -421,11 +471,10 @@ class GameViewModel : ViewModel() {
 
     private fun pickWeightedLoseStep(): Int {
         val roll = Random.nextInt(100)
-
         return when {
-            roll < 10 -> 2   // 10%
-            roll < 45 -> 3   // 35%
-            else -> 4        // 55%
+            roll < 15 -> 2
+            roll < 50 -> 3
+            else -> 4
         }
     }
 
@@ -452,7 +501,6 @@ class GameViewModel : ViewModel() {
         val filler5 = drawRandomCardExcluding(fixedUsedCards)
         fixedUsedCards.add(filler5)
 
-        // После заполнения болванки возвращаем used только для реально заданных карт 1 и 2.
         fixedUsedCards.clear()
         fixedUsedCards.add(first)
         fixedUsedCards.add(second)
@@ -478,7 +526,6 @@ class GameViewModel : ViewModel() {
         wantHigher: Boolean,
         exclude: Set<Card>
     ): Card {
-
         repeat(5000) {
             val candidate = HiLoEngine.drawFiveCards().random()
 
@@ -491,13 +538,38 @@ class GameViewModel : ViewModel() {
             }
         }
 
-        // fallback если вдруг долго не нашли
         repeat(5000) {
             val candidate = HiLoEngine.drawFiveCards().random()
 
             when (HiLoEngine.compare(prev, candidate)) {
                 CompareResult.HIGHER -> if (wantHigher) return candidate
                 CompareResult.LOWER -> if (!wantHigher) return candidate
+                CompareResult.TIE -> { }
+            }
+        }
+
+        return HiLoEngine.drawFiveCards().first()
+    }
+
+    private fun drawRandomNonTieCardRelativeTo(
+        prev: Card,
+        exclude: Set<Card>
+    ): Card {
+        repeat(5000) {
+            val candidate = HiLoEngine.drawFiveCards().random()
+
+            if (candidate in exclude) return@repeat
+
+            when (HiLoEngine.compare(prev, candidate)) {
+                CompareResult.HIGHER, CompareResult.LOWER -> return candidate
+                CompareResult.TIE -> { }
+            }
+        }
+
+        repeat(5000) {
+            val candidate = HiLoEngine.drawFiveCards().random()
+            when (HiLoEngine.compare(prev, candidate)) {
+                CompareResult.HIGHER, CompareResult.LOWER -> return candidate
                 CompareResult.TIE -> { }
             }
         }
@@ -520,7 +592,7 @@ class GameViewModel : ViewModel() {
         Log.d(
             TAG,
             "Deck mode=${_deckMode.value}, fixedRtp=${_fixedRtpInput.value}, " +
-                    "fixedShouldWin=$fixedShouldWin, fixedLoseStep=$fixedLoseStep"
+                    "fixedShouldWin=$fixedShouldWin, fixedLoseStep=$fixedLoseStep, stats=${_stats.value}"
         )
         cards.forEachIndexed { index, card ->
             Log.d(TAG, "[${index + 1}] ${card.rank.label}${card.suit.symbol}")

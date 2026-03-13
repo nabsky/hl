@@ -61,6 +61,7 @@ fun MainScreen(
     val state by vm.state.collectAsState()
     val deckMode by vm.deckMode.collectAsState()
     val fixedRtpInput by vm.fixedRtpInput.collectAsState()
+    val stats by vm.stats.collectAsState()
 
     var showDeckModeDialog by remember { mutableStateOf(false) }
     var tempDeckMode by remember(showDeckModeDialog, deckMode) { mutableStateOf(deckMode) }
@@ -235,13 +236,34 @@ fun MainScreen(
         }
 
         if (showDeckModeDialog) {
+            val rtpValue = tempRtpInput.replace(',', '.').toDoubleOrNull()?.coerceIn(0.0, 100.0) ?: 0.0
+            val winChancePercent = rtpValue / 16.0
+            val oneIn = if (winChancePercent > 0.0) 100.0 / winChancePercent else null
+
+            val currentFactRtp = if (stats.totalIn > 0L) {
+                stats.totalOut.toDouble() * 100.0 / stats.totalIn.toDouble()
+            } else {
+                0.0
+            }
+
             AlertDialog(
                 onDismissRequest = { showDeckModeDialog = false },
                 title = {
                     Text("Deck Mode")
                 },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Games: ${stats.gamesCount}    Wins: ${stats.winsCount}"
+                        )
+
+                        Text(
+                            text = "IN: ${formatAmount(stats.totalIn)}    OUT: ${formatAmount(stats.totalOut)}    RTP: ${"%.2f".format(currentFactRtp)}%"
+                        )
+
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -287,17 +309,13 @@ fun MainScreen(
                                         }
                                     }
                                 },
-                                modifier = Modifier.width(110.dp),
+                                modifier = Modifier.width(120.dp),
                                 singleLine = true,
                                 label = { Text("Fixed RTP") },
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Decimal
                                 )
                             )
-
-                            val rtpValue = tempRtpInput.replace(',', '.').toDoubleOrNull()?.coerceIn(0.0, 100.0) ?: 0.0
-                            val winChancePercent = rtpValue / 16.0
-                            val oneIn = if (winChancePercent > 0.0) 100.0 / winChancePercent else null
 
                             Text(
                                 text = if (oneIn != null) {
@@ -314,9 +332,7 @@ fun MainScreen(
                     Button(
                         onClick = {
                             vm.setDeckMode(tempDeckMode, context)
-                            if (tempDeckMode == DeckMode.FIXED_RTP) {
-                                vm.commitFixedRtp(tempRtpInput, context)
-                            }
+                            vm.commitFixedRtp(tempRtpInput, context)
                             showDeckModeDialog = false
                         }
                     ) {
