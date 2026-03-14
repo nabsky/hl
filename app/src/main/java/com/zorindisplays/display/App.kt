@@ -5,6 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
@@ -14,6 +15,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.zIndex
 import com.zorindisplays.display.model.UiState
 import com.zorindisplays.display.ui.GameViewModel
@@ -27,19 +30,6 @@ fun App(
     val context = LocalContext.current
     val imageLoader = remember { buildSvgImageLoader(context) }
     val state by vm.state.collectAsState()
-
-    val bgRes = when (state) {
-        UiState.Idle -> R.drawable.bg_00
-        is UiState.Playing -> when ((state as UiState.Playing).revealedCount) {
-            1 -> R.drawable.bg_01
-            2 -> R.drawable.bg_01
-            3 -> R.drawable.bg_01
-            4 -> R.drawable.bg_01
-            else -> R.drawable.bg_01
-        }
-        is UiState.Won -> R.drawable.bg_01
-        else -> R.drawable.bg_01
-    }
 
     val fgRes = when (state) {
         UiState.Idle -> null
@@ -55,17 +45,6 @@ fun App(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-
-/*
-        Image(
-            painter = painterResource(bgRes),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-*/
-
-
         MainScreen(
             imageLoader = imageLoader,
             vm = vm
@@ -83,27 +62,61 @@ fun App(
         }
     }
 
-    // Воспроизведение coins.wav при playCoinSound
-    if (state is UiState.Playing && (state as UiState.Playing).playCoinSound) {
-        LaunchedEffect((state as UiState.Playing).confettiTick) {
-            MediaPlayer.create(context, R.raw.coins).apply {
-                setOnCompletionListener { release() }
-                start()
-            }
-            // Сбросить playCoinSound после воспроизведения
-            vm.onCoinSoundPlayed()
+    var coinPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var winPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            coinPlayer?.release()
+            coinPlayer = null
+            winPlayer?.release()
+            winPlayer = null
         }
     }
 
-    // Воспроизведение winner.wav при playWinnerSound
     if (state is UiState.Won && (state as UiState.Won).playWinnerSound) {
         LaunchedEffect((state as UiState.Won).amount) {
-            MediaPlayer.create(context, R.raw.win).apply {
-                setOnCompletionListener { release() }
-                start()
+
+            winPlayer?.release()
+
+            val player = MediaPlayer.create(context, R.raw.win)
+
+            if (player != null) {
+                winPlayer = player
+
+                player.setOnCompletionListener { mp ->
+                    mp.release()
+                    if (winPlayer === mp) winPlayer = null
+                    vm.onWinnerSoundPlayed()
+                }
+
+                player.start()
+            } else {
+                vm.onWinnerSoundPlayed()
             }
-            // Сбросить playWinnerSound после воспроизведения
-            vm.onWinnerSoundPlayed()
+        }
+    }
+
+    if (state is UiState.Playing && (state as UiState.Playing).playCoinSound) {
+        LaunchedEffect((state as UiState.Playing).confettiTick) {
+
+            coinPlayer?.release()
+
+            val player = MediaPlayer.create(context, R.raw.coins)
+
+            if (player != null) {
+                coinPlayer = player
+
+                player.setOnCompletionListener { mp ->
+                    mp.release()
+                    if (coinPlayer === mp) coinPlayer = null
+                    vm.onCoinSoundPlayed()
+                }
+
+                player.start()
+            } else {
+                vm.onCoinSoundPlayed()
+            }
         }
     }
 }

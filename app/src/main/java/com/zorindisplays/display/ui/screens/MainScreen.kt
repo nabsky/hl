@@ -1,6 +1,5 @@
 package com.zorindisplays.display.ui.screens
 
-import android.media.MediaPlayer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -501,34 +500,7 @@ fun MainScreen(
             }
         }
 
-        val playCoinSound = (state as? UiState.Playing)?.playCoinSound == true
         val context = LocalContext.current
-        var coinsPlayer: MediaPlayer? by remember { mutableStateOf(null) }
-
-        LaunchedEffect(playCoinSound) {
-            if (playCoinSound) {
-                if (coinsPlayer?.isPlaying == true) return@LaunchedEffect
-                coinsPlayer?.release()
-                coinsPlayer = MediaPlayer.create(context, R.raw.coins)
-                coinsPlayer?.setOnCompletionListener { mp ->
-                    mp.release()
-                    coinsPlayer = null
-                }
-                coinsPlayer?.start()
-                vm.onCoinSoundPlayed()
-            }
-        }
-
-        if (state is UiState.Won && (state as UiState.Won).playWinnerSound) {
-            LaunchedEffect((state as UiState.Won).amount) {
-                MediaPlayer.create(context, R.raw.win).apply {
-                    setOnCompletionListener { release() }
-                    start()
-                }
-                vm.onWinnerSoundPlayed()
-            }
-        }
-
         if (showDeckModeDialog) {
             val rtpValue = tempRtpInput.replace(',', '.').toDoubleOrNull()?.coerceIn(0.0, 100.0) ?: 0.0
             val winChancePercent = rtpValue / 16.0
@@ -897,11 +869,6 @@ private fun FlipCard(
             targetValue = 90f,
             animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
         )
-
-        MediaPlayer.create(context, R.raw.flick).apply {
-            setOnCompletionListener { release() }
-            start()
-        }
 
         shownFaceUp = faceUp
         rotation.snapTo(-90f)
