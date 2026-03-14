@@ -12,7 +12,7 @@ import com.zorindisplays.hilo.R
 val DefaultBackground = Color.Black
 val PrimaryTextColor = Color.White
 
-val JackpotTopAmountPadding = 80.dp
+val JackpotTopAmountPadding = 60.dp
 
 // Fonts
 val MontserratBold = FontFamily(

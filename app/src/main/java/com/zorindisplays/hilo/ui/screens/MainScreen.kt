@@ -858,14 +858,17 @@ fun MainScreen(
                     }
 
                     if (state is UiState.Won) {
-                        WinAnimatedAmountOverlay(amount = overlayAmount)
+                        WinAnimatedAmountOverlay(
+                            amount = overlayAmount,
+                            modifier = Modifier.offset(y = -30.dp))
                     } else {
                         AnimatedAmountText(
                             targetAmount = overlayAmount,
                             format = ::formatAmount,
-                            fontSize = 80.sp,
-                            strokeWidth = 12f,
-                            animateOnFirst = false
+                            fontSize = 100.sp,
+                            strokeWidth = 20f,
+                            animateOnFirst = false,
+                            modifier = Modifier.offset(y = 0.dp)
                         )
                     }
                 }
@@ -897,7 +900,7 @@ private fun AmountEntryView(raw: String) {
         ) {
             GoldShineText(
                 text = formatAmount(raw.toLongOrNull() ?: 0L),
-                fontSize = 72.sp,
+                fontSize = 100.sp,
                 strokeWidth = 20f
             )
         }
@@ -1084,7 +1087,7 @@ private fun WinAnimatedAmountOverlay(
 
     GoldShineText(
         text = formatAmount(shownAmount),
-        fontSize = 72.sp,
+        fontSize = 100.sp,
         strokeWidth = 20f,
         modifier = modifier
     )
