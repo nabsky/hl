@@ -4,7 +4,11 @@ import android.media.MediaPlayer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -76,6 +80,14 @@ fun MainScreen(
     vm: GameViewModel = viewModel()
 ) {
     val state by vm.state.collectAsState()
+    val overlayAmount: Long? = when (val st = state) {
+        is UiState.Ready -> st.amount
+        is UiState.Playing -> st.amount
+        is UiState.Won -> st.amount
+        is UiState.Lost -> st.lastAmount
+        else -> null
+    }
+
     val deckMode by vm.deckMode.collectAsState()
     val fixedRtpInput by vm.fixedRtpInput.collectAsState()
     val stats by vm.stats.collectAsState()
@@ -241,21 +253,10 @@ fun MainScreen(
                     else -> 0
                 }
 
-                val amount: Long? = when (st) {
-                    is UiState.Ready -> st.amount
-                    is UiState.Playing -> st.amount
-                    is UiState.Won -> st.amount
-                    is UiState.Lost -> st.lastAmount
-                    else -> null
-                }
-
                 RoundView(
-                    amount = amount,
                     cards = cards,
                     revealedCount = revealedCount,
-                    imageLoader = imageLoader,
-                    isLoseScreen = st is UiState.Lost,
-                    isWonScreen = st is UiState.Won
+                    imageLoader = imageLoader
                 )
             }
         }
@@ -741,6 +742,67 @@ fun MainScreen(
                 }
             )
         }
+
+        if (overlayAmount != null) {
+
+            val isWon = state is UiState.Won
+
+            val scale by rememberInfiniteTransition(label = "amountPulse")
+                .animateFloat(
+                    initialValue = 1f,
+                    targetValue = if (isWon) 1.06f else 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(700),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "amountScale"
+                )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(3000f),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = JackpotTopAmountPadding)
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                ) {
+
+                    if (isWon) {
+
+                        Canvas(
+                            modifier = Modifier
+                                .size(420.dp)
+                                .alpha(0.75f)
+                        ) {
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(
+                                        Color(0x88FFD54A),
+                                        Color(0x33FFD54A),
+                                        Color.Transparent
+                                    )
+                                ),
+                                radius = size.minDimension * 0.45f
+                            )
+                        }
+                    }
+
+                    AnimatedAmountText(
+                        targetAmount = overlayAmount,
+                        format = ::formatAmount,
+                        fontSize = 80.sp,
+                        strokeWidth = 12f,
+                        animateOnFirst = false
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -786,48 +848,11 @@ private fun AmountEntryView(raw: String) {
 
 @Composable
 private fun RoundView(
-    amount: Long?,
     cards: List<Card>,
     revealedCount: Int,
-    imageLoader: ImageLoader,
-    isLoseScreen: Boolean,
-    isWonScreen: Boolean
+    imageLoader: ImageLoader
 ) {
-    var showAmount by remember { mutableStateOf(true) }
-
-    LaunchedEffect(isLoseScreen) {
-        if (isLoseScreen) {
-            showAmount = true
-            kotlinx.coroutines.delay(1000)
-            showAmount = false
-        } else {
-            showAmount = true
-        }
-    }
-
     Box(Modifier.fillMaxSize()) {
-        if (showAmount && amount != null) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = JackpotTopAmountPadding)
-            ) {
-                AnimatedVisibility(
-                    visible = showAmount,
-                    enter = fadeIn(),
-                    exit = fadeOut(animationSpec = tween(400))
-                ) {
-                    AnimatedAmountText(
-                        targetAmount = amount,
-                        format = ::formatAmount,
-                        fontSize = 72.sp,
-                        strokeWidth = 20f,
-                        animateOnFirst = false
-                    )
-                }
-            }
-        }
-
         Row(
             modifier = Modifier
                 .align(Alignment.Center)
