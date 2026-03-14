@@ -729,19 +729,27 @@ fun MainScreen(
 
                                     val url = "https://nabsky.bitbucket.io/baccarat/$code.apk"
 
+                                    updateInProgress = true
+                                    updateProgress = 0
+                                    updateStatus = "Preparing update..."
+
                                     updater.downloadAndInstall(
                                         url = url,
                                         fileName = "update.apk",
                                         onProgress = { percent ->
                                             updateProgress = percent
+                                        },
+                                        onError = { error ->
+                                            updateInProgress = false
+                                            updateStatus = error
                                         }
                                     )
 
-                                    updateStatus = "Starting install..."
                                     showUpdateDialog = false
+                                    updateCode = ""
                                     updateStatus = ""
                                     updateProgress = 0
-                                    updateCode = ""
+                                    updateInProgress = false
                                 } catch (t: Throwable) {
                                     updateStatus = t.message ?: "Update failed"
                                 } finally {

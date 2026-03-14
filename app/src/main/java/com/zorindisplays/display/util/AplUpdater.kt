@@ -1,85 +1,122 @@
 package com.zorindisplays.display.util
 
+import android.app.DownloadManager
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.database.Cursor
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import androidx.core.content.FileProvider
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import java.io.File
-import java.io.IOException
 
 class ApkUpdater(private val context: Context) {
 
-    private val client = OkHttpClient()
+    private val appContext = context.applicationContext
 
-    suspend fun downloadAndInstall(
+    fun downloadAndInstall(
         url: String,
         fileName: String,
-        onProgress: (percent: Int) -> Unit = {}
-    ) = withContext(Dispatchers.IO) {
+        onProgress: (percent: Int) -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        val request = DownloadManager.Request(Uri.parse(url))
+            .setTitle("Software Update")
+            .setDescription("Downloading update...")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+            .setAllowedOverMetered(true)
+            .setAllowedOverRoaming(true)
+            .setMimeType("application/vnd.android.package-archive")
+            .setDestinationInExternalFilesDir(
+                appContext,
+                Environment.DIRECTORY_DOWNLOADS,
+                fileName
+            )
 
-        val dir = context.getExternalFilesDir(null)
-            ?: throw IllegalStateException("No external files dir")
-        val outFile = File(dir, fileName)
-        if (outFile.exists()) outFile.delete()
+        val dm = appContext.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val downloadId = dm.enqueue(request)
 
-        val req = Request.Builder().url(url).build()
-        client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) {
-                throw IOException("HTTP ${resp.code}")
-            }
+        val handler = Handler(Looper.getMainLooper())
+        val poll = object : Runnable {
+            override fun run() {
+                val query = DownloadManager.Query().setFilterById(downloadId)
+                val cursor: Cursor = dm.query(query)
 
-            val body = resp.body ?: throw IOException("Empty body")
-            val total = body.contentLength().coerceAtLeast(1L)
+                cursor.use {
+                    if (!it.moveToFirst()) {
+                        onError("Download not found")
+                        return
+                    }
 
-            body.byteStream().use { input ->
-                outFile.outputStream().use { output ->
-                    val buf = ByteArray(8 * 1024)
-                    var sum = 0L
-                    var last = -1
-                    while (true) {
-                        val read = input.read(buf)
-                        if (read <= 0) break
-                        output.write(buf, 0, read)
-                        sum += read
-                        val p = ((sum * 100) / total).toInt().coerceIn(0, 100)
-                        if (p != last) {
-                            last = p
-                            onProgress(p)
+                    val status =
+                        it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+
+                    when (status) {
+                        DownloadManager.STATUS_RUNNING,
+                        DownloadManager.STATUS_PAUSED,
+                        DownloadManager.STATUS_PENDING -> {
+                            val total =
+                                it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                            val downloaded =
+                                it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+
+                            if (total > 0) {
+                                val percent = ((downloaded * 100) / total).toInt().coerceIn(0, 100)
+                                onProgress(percent)
+                            }
+
+                            handler.postDelayed(this, 300)
+                        }
+
+                        DownloadManager.STATUS_SUCCESSFUL -> {
+                            onProgress(100)
+
+                            val localUri =
+                                it.getString(it.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI))
+                            if (localUri.isNullOrBlank()) {
+                                onError("Downloaded file uri is empty")
+                                return
+                            }
+
+                            installDownloadedApk(localUri)
+                        }
+
+                        DownloadManager.STATUS_FAILED -> {
+                            val reason =
+                                it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
+                            onError("Download failed: reason=$reason")
                         }
                     }
-                    output.flush()
                 }
             }
         }
 
-        withContext(Dispatchers.Main) {
-            installApk(outFile)
-        }
+        handler.post(poll)
     }
 
-    private fun installApk(file: File) {
-        val intent = Intent(Intent.ACTION_VIEW).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    private fun installDownloadedApk(localUri: String) {
+        val sourceUri = Uri.parse(localUri)
+        val file = File(requireNotNull(sourceUri.path))
 
-        val apkUri: Uri =
-            if (Build.VERSION.SDK_INT >= 24) {
-                FileProvider.getUriForFile(
-                    context,
-                    context.packageName + ".provider",
-                    file
-                )
-            } else {
-                Uri.fromFile(file)
-            }
+        val contentUri = FileProvider.getUriForFile(
+            appContext,
+            "${appContext.packageName}.provider",
+            file
+        )
 
-        intent.setDataAndType(apkUri, "application/vnd.android.package-archive")
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(contentUri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
 
-        context.startActivity(intent)
+        try {
+            appContext.startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
+            throw IllegalStateException("No package installer found")
+        }
     }
 }
