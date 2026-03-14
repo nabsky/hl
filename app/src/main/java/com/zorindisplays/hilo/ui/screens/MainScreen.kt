@@ -8,6 +8,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -330,59 +331,65 @@ fun MainScreen(
 
         if (isWon) {
             var showTrophy by remember { mutableStateOf(false) }
+            var starsActive by remember { mutableStateOf(false) }
 
             LaunchedEffect(isWon) {
                 showTrophy = false
-                delay(250)
+                starsActive = false
+                delay(180)
                 showTrophy = true
             }
 
             if (showTrophy) {
                 val trophyOffsetY = remember { Animatable(-900f) }
-                val trophyScale = remember { Animatable(0.55f) }
+                val trophyScale = remember { Animatable(0.82f) }
                 val trophyAlpha = remember { Animatable(0f) }
-                val trophyRotation = remember { Animatable(-10f) }
+                val trophyRotation = remember { Animatable(-8f) }
 
                 val glowAlpha = remember { Animatable(0f) }
                 val flashAlpha = remember { Animatable(0f) }
 
-                val sparkLeftAlpha = remember { Animatable(0f) }
-                val sparkRightAlpha = remember { Animatable(0f) }
-                val sparkTopAlpha = remember { Animatable(0f) }
-
-                val sparkLeftOffset = remember { Animatable(0f) }
-                val sparkRightOffset = remember { Animatable(0f) }
-                val sparkTopOffset = remember { Animatable(0f) }
-
                 LaunchedEffect(Unit) {
                     coroutineScope {
                         launch {
-                            trophyAlpha.animateTo(1f, tween(220))
+                            trophyAlpha.animateTo(1f, tween(180))
                         }
 
                         launch {
                             glowAlpha.animateTo(
                                 targetValue = 1f,
-                                animationSpec = tween(700, easing = FastOutSlowInEasing)
+                                animationSpec = tween(550, easing = FastOutSlowInEasing)
                             )
                         }
 
                         launch {
-                            flashAlpha.animateTo(1f, tween(120))
-                            flashAlpha.animateTo(0f, tween(260))
+                            flashAlpha.animateTo(1f, tween(100))
+                            flashAlpha.animateTo(0f, tween(220))
                         }
 
                         launch {
                             trophyRotation.animateTo(
                                 targetValue = 0f,
-                                animationSpec = tween(700, easing = FastOutSlowInEasing)
+                                animationSpec = tween(520, easing = FastOutSlowInEasing)
+                            )
+                        }
+
+                        launch {
+                            // Сразу растёт во время падения, без паузы после приземления
+                            trophyScale.animateTo(
+                                targetValue = 1.08f,
+                                animationSpec = tween(620, easing = FastOutSlowInEasing)
+                            )
+                            trophyScale.animateTo(
+                                targetValue = 1f,
+                                animationSpec = tween(180, easing = FastOutSlowInEasing)
                             )
                         }
 
                         trophyOffsetY.animateTo(
-                            targetValue = 40f,
+                            targetValue = 34f,
                             animationSpec = tween(
-                                durationMillis = 650,
+                                durationMillis = 620,
                                 easing = FastOutSlowInEasing
                             )
                         )
@@ -395,37 +402,7 @@ fun MainScreen(
                             )
                         )
 
-                        launch {
-                            trophyScale.animateTo(
-                                targetValue = 1.08f,
-                                animationSpec = tween(500, easing = FastOutSlowInEasing)
-                            )
-                            trophyScale.animateTo(
-                                targetValue = 1f,
-                                animationSpec = tween(220, easing = FastOutSlowInEasing)
-                            )
-                        }
-
-                        launch {
-                            delay(120)
-                            sparkLeftAlpha.animateTo(1f, tween(100))
-                            sparkLeftOffset.animateTo(-30f, tween(450, easing = FastOutSlowInEasing))
-                            sparkLeftAlpha.animateTo(0f, tween(220))
-                        }
-
-                        launch {
-                            delay(170)
-                            sparkRightAlpha.animateTo(1f, tween(100))
-                            sparkRightOffset.animateTo(30f, tween(450, easing = FastOutSlowInEasing))
-                            sparkRightAlpha.animateTo(0f, tween(220))
-                        }
-
-                        launch {
-                            delay(90)
-                            sparkTopAlpha.animateTo(1f, tween(100))
-                            sparkTopOffset.animateTo(-26f, tween(420, easing = FastOutSlowInEasing))
-                            sparkTopAlpha.animateTo(0f, tween(220))
-                        }
+                        starsActive = true
                     }
                 }
 
@@ -470,33 +447,7 @@ fun MainScreen(
                             .background(Color.White.copy(alpha = 0.35f))
                     )
 
-                    Image(
-                        painter = painterResource(R.drawable.spark_star),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .offset(x = (-120).dp + sparkLeftOffset.value.dp, y = (-90).dp)
-                            .graphicsLayer { alpha = sparkLeftAlpha.value }
-                            .size(42.dp)
-                    )
-
-                    Image(
-                        painter = painterResource(R.drawable.spark_star),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .offset(x = 120.dp + sparkRightOffset.value.dp, y = (-70).dp)
-                            .graphicsLayer { alpha = sparkRightAlpha.value }
-                            .size(36.dp)
-                    )
-
-                    Image(
-                        painter = painterResource(R.drawable.spark_star),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .offset(y = (-180).dp + sparkTopOffset.value.dp)
-                            .graphicsLayer { alpha = sparkTopAlpha.value }
-                            .size(48.dp)
-                    )
-
+                    // Сам кубок
                     Image(
                         painter = painterResource(R.drawable.trophy),
                         contentDescription = null,
@@ -510,6 +461,95 @@ fun MainScreen(
                             }
                             .size(420.dp)
                     )
+
+                    // Звёздочки ПОВЕРХ кубка, мигают по очереди бесконечно
+                    if (starsActive) {
+                        val starsTransition = rememberInfiniteTransition(label = "trophyStars")
+
+                        val leftStarAlpha by starsTransition.animateFloat(
+                            initialValue = 0.18f,
+                            targetValue = 1f,
+                            animationSpec = infiniteRepeatable(
+                                animation = keyframes {
+                                    durationMillis = 1800
+                                    0.18f at 0
+                                    0.18f at 120
+                                    1f at 260
+                                    0.35f at 430
+                                    0.18f at 600
+                                    0.18f at 1800
+                                },
+                                repeatMode = RepeatMode.Restart
+                            ),
+                            label = "leftStarAlpha"
+                        )
+
+                        val topStarAlpha by starsTransition.animateFloat(
+                            initialValue = 0.18f,
+                            targetValue = 1f,
+                            animationSpec = infiniteRepeatable(
+                                animation = keyframes {
+                                    durationMillis = 1800
+                                    0.18f at 0
+                                    0.18f at 620
+                                    1f at 760
+                                    0.35f at 930
+                                    0.18f at 1100
+                                    0.18f at 1800
+                                },
+                                repeatMode = RepeatMode.Restart
+                            ),
+                            label = "topStarAlpha"
+                        )
+
+                        val rightStarAlpha by starsTransition.animateFloat(
+                            initialValue = 0.18f,
+                            targetValue = 1f,
+                            animationSpec = infiniteRepeatable(
+                                animation = keyframes {
+                                    durationMillis = 1800
+                                    0.18f at 0
+                                    0.18f at 1120
+                                    1f at 1260
+                                    0.35f at 1430
+                                    0.18f at 1600
+                                    0.18f at 1800
+                                },
+                                repeatMode = RepeatMode.Restart
+                            ),
+                            label = "rightStarAlpha"
+                        )
+
+                        Image(
+                            painter = painterResource(R.drawable.spark_star),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .offset(x = (-108).dp, y = (-88).dp)
+                                .graphicsLayer { alpha = leftStarAlpha }
+                                .size(42.dp)
+                                .zIndex(1100f)
+                        )
+
+                        Image(
+                            painter = painterResource(R.drawable.spark_star),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .offset(y = (-178).dp)
+                                .graphicsLayer { alpha = topStarAlpha }
+                                .size(48.dp)
+                                .zIndex(1100f)
+                        )
+
+                        Image(
+                            painter = painterResource(R.drawable.spark_star),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .offset(x = 112.dp, y = (-70).dp)
+                                .graphicsLayer { alpha = rightStarAlpha }
+                                .size(36.dp)
+                                .zIndex(1100f)
+                        )
+                    }
                 }
             }
         }
