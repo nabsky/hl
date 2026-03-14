@@ -4,12 +4,20 @@ import android.media.MediaPlayer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -35,7 +43,6 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
-import com.airbnb.lottie.compose.*
 import com.zorindisplays.display.R
 import com.zorindisplays.display.model.Card
 import com.zorindisplays.display.model.Guess
@@ -51,8 +58,19 @@ import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.util.Locale
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import com.zorindisplays.display.ui.WinKonfettiOverlay
+import com.zorindisplays.display.ui.components.CoinBurstOverlay
+import com.zorindisplays.display.ui.components.CoinRainOverlay
+import com.zorindisplays.display.ui.components.TableBackground
+import com.zorindisplays.display.ui.theme.JackpotTopAmountPadding
 import kotlinx.coroutines.launch
 import com.zorindisplays.display.util.ApkUpdater
+import kotlinx.coroutines.coroutineScope
 
 @Composable
 fun MainScreen(
@@ -68,6 +86,8 @@ fun MainScreen(
     var tempDeckMode by remember(showDeckModeDialog, deckMode) { mutableStateOf(deckMode) }
     var tempRtpInput by remember(showDeckModeDialog, fixedRtpInput) { mutableStateOf(fixedRtpInput) }
 
+    val showTopTokens = state is UiState.AmountEntry || state is UiState.Ready
+
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
@@ -81,6 +101,7 @@ fun MainScreen(
     var updateStatus by remember { mutableStateOf("") }
     var updateProgress by remember { mutableStateOf(0) }
     var updateInProgress by remember { mutableStateOf(false) }
+    val tokensPainter = painterResource(R.drawable.tokens)
 
     val versionName = remember {
         try {
@@ -126,6 +147,66 @@ fun MainScreen(
                 }
             }
     ) {
+        TableBackground()
+
+
+        AnimatedVisibility(
+            visible = showTopTokens,
+            enter = slideInVertically(
+                initialOffsetY = { -it },
+                animationSpec = tween(550)
+            ) + fadeIn(
+                animationSpec = tween(550)
+            ),
+            exit = slideOutHorizontally(
+                targetOffsetX = { -it },
+                animationSpec = tween(380)
+            ) + fadeOut(
+                animationSpec = tween(380)
+            ),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(40.dp)
+        ) {
+            Image(
+                painter = tokensPainter,
+                contentDescription = null,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .size(180.dp, 115.dp)
+                    .alpha(0.9f)
+            )
+        }
+
+        AnimatedVisibility(
+            visible = showTopTokens,
+            enter = slideInVertically(
+                initialOffsetY = { -it },
+                animationSpec = tween(550)
+            ) + fadeIn(
+                animationSpec = tween(550)
+            ),
+            exit = slideOutHorizontally(
+                targetOffsetX = { it },
+                animationSpec = tween(380)
+            ) + fadeOut(
+                animationSpec = tween(380)
+            ),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(40.dp)
+        ) {
+            Image(
+                painter = tokensPainter,
+                contentDescription = null,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .scale(scaleX = -1f, scaleY = 1f)
+                    .size(180.dp, 115.dp)
+                    .alpha(0.9f)
+            )
+        }
+
         when (val st = state) {
             UiState.Idle -> IdleView()
 
@@ -191,36 +272,187 @@ fun MainScreen(
         val isWon = state is UiState.Won
 
         if (isWon) {
-            var showLottie by remember { mutableStateOf(false) }
+            var showTrophy by remember { mutableStateOf(false) }
 
             LaunchedEffect(isWon) {
-                showLottie = false
-                kotlinx.coroutines.delay(400)
-                showLottie = true
+                showTrophy = false
+                kotlinx.coroutines.delay(250)
+                showTrophy = true
             }
 
-            if (showLottie) {
-                val composition by rememberLottieComposition(
-                    LottieCompositionSpec.RawRes(R.raw.winner)
-                )
-                val progress by animateLottieCompositionAsState(
-                    composition = composition,
-                    iterations = 1,
-                    isPlaying = true
-                )
+            if (showTrophy) {
+                val trophyOffsetY = remember { Animatable(-900f) }
+                val trophyScale = remember { Animatable(0.55f) }
+                val trophyAlpha = remember { Animatable(0f) }
+                val trophyRotation = remember { Animatable(-10f) }
+
+                val glowAlpha = remember { Animatable(0f) }
+                val flashAlpha = remember { Animatable(0f) }
+
+                val sparkLeftAlpha = remember { Animatable(0f) }
+                val sparkRightAlpha = remember { Animatable(0f) }
+                val sparkTopAlpha = remember { Animatable(0f) }
+
+                val sparkLeftOffset = remember { Animatable(0f) }
+                val sparkRightOffset = remember { Animatable(0f) }
+                val sparkTopOffset = remember { Animatable(0f) }
+
+                LaunchedEffect(Unit) {
+                    coroutineScope {
+                        launch {
+                            trophyAlpha.animateTo(1f, tween(220))
+                        }
+
+                        launch {
+                            glowAlpha.animateTo(
+                                targetValue = 1f,
+                                animationSpec = tween(700, easing = FastOutSlowInEasing)
+                            )
+                        }
+
+                        launch {
+                            flashAlpha.animateTo(1f, tween(120))
+                            flashAlpha.animateTo(0f, tween(260))
+                        }
+
+                        launch {
+                            trophyRotation.animateTo(
+                                targetValue = 0f,
+                                animationSpec = tween(700, easing = FastOutSlowInEasing)
+                            )
+                        }
+
+                        trophyOffsetY.animateTo(
+                            targetValue = 40f,
+                            animationSpec = tween(
+                                durationMillis = 650,
+                                easing = FastOutSlowInEasing
+                            )
+                        )
+
+                        trophyOffsetY.animateTo(
+                            targetValue = 0f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessLow
+                            )
+                        )
+
+                        launch {
+                            trophyScale.animateTo(
+                                targetValue = 1.08f,
+                                animationSpec = tween(500, easing = FastOutSlowInEasing)
+                            )
+                            trophyScale.animateTo(
+                                targetValue = 1f,
+                                animationSpec = tween(220, easing = FastOutSlowInEasing)
+                            )
+                        }
+
+                        launch {
+                            kotlinx.coroutines.delay(120)
+                            sparkLeftAlpha.animateTo(1f, tween(100))
+                            sparkLeftOffset.animateTo(-30f, tween(450, easing = FastOutSlowInEasing))
+                            sparkLeftAlpha.animateTo(0f, tween(220))
+                        }
+
+                        launch {
+                            kotlinx.coroutines.delay(170)
+                            sparkRightAlpha.animateTo(1f, tween(100))
+                            sparkRightOffset.animateTo(30f, tween(450, easing = FastOutSlowInEasing))
+                            sparkRightAlpha.animateTo(0f, tween(220))
+                        }
+
+                        launch {
+                            kotlinx.coroutines.delay(90)
+                            sparkTopAlpha.animateTo(1f, tween(100))
+                            sparkTopOffset.animateTo(-26f, tween(420, easing = FastOutSlowInEasing))
+                            sparkTopAlpha.animateTo(0f, tween(220))
+                        }
+                    }
+                }
 
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .zIndex(1000f),
-                    contentAlignment = Alignment.BottomCenter
+                    contentAlignment = Alignment.Center
                 ) {
-                    LottieAnimation(
-                        composition = composition,
-                        progress = { progress },
+                    Box(
                         modifier = Modifier
-                            .scale(4f)
-                            .padding(bottom = 60.dp)
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.18f))
+                    )
+
+                    WinKonfettiOverlay(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .zIndex(999f)
+                    )
+
+                    Canvas(
+                        modifier = Modifier
+                            .size(560.dp)
+                            .graphicsLayer { alpha = glowAlpha.value }
+                    ) {
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    Color(0x88FFD54A),
+                                    Color(0x33FFD54A),
+                                    Color.Transparent
+                                )
+                            ),
+                            radius = size.minDimension * 0.48f
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { alpha = flashAlpha.value }
+                            .background(Color.White.copy(alpha = 0.35f))
+                    )
+
+                    Image(
+                        painter = painterResource(R.drawable.spark_star),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .offset(x = (-120).dp + sparkLeftOffset.value.dp, y = (-90).dp)
+                            .graphicsLayer { alpha = sparkLeftAlpha.value }
+                            .size(42.dp)
+                    )
+
+                    Image(
+                        painter = painterResource(R.drawable.spark_star),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .offset(x = 120.dp + sparkRightOffset.value.dp, y = (-70).dp)
+                            .graphicsLayer { alpha = sparkRightAlpha.value }
+                            .size(36.dp)
+                    )
+
+                    Image(
+                        painter = painterResource(R.drawable.spark_star),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .offset(y = (-180).dp + sparkTopOffset.value.dp)
+                            .graphicsLayer { alpha = sparkTopAlpha.value }
+                            .size(48.dp)
+                    )
+
+                    Image(
+                        painter = painterResource(R.drawable.trophy),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .offset(y = trophyOffsetY.value.dp + 20.dp)
+                            .graphicsLayer {
+                                alpha = trophyAlpha.value
+                                scaleX = trophyScale.value
+                                scaleY = trophyScale.value
+                                rotationZ = trophyRotation.value
+                            }
+                            .size(420.dp)
                     )
                 }
             }
@@ -489,7 +721,7 @@ private fun AmountEntryView(raw: String) {
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 24.dp)
+                .padding(top = JackpotTopAmountPadding)
         ) {
             GoldShineText(
                 text = formatAmount(raw.toLongOrNull() ?: 0L),
@@ -537,7 +769,7 @@ private fun RoundView(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 24.dp)
+                    .padding(top = JackpotTopAmountPadding)
             ) {
                 AnimatedVisibility(
                     visible = showAmount,
@@ -626,11 +858,25 @@ private fun FlipCard(
 
     val url = if (shownFaceUp && card != null) card.assetUrl() else cardBackAssetUrl()
 
+    val isAnimating = kotlin.math.abs(rotation.value) > 0.5f
+
     Box(
-        modifier = modifier.graphicsLayer {
-            rotationY = rotation.value
-            cameraDistance = 24f * density
-        }
+        modifier = modifier
+            .then(
+                if (!isAnimating) {
+                    Modifier.shadow(
+                        elevation = 12.dp,
+                        shape = RoundedCornerShape(10.dp),
+                        clip = false
+                    )
+                } else {
+                    Modifier
+                }
+            )
+            .graphicsLayer {
+                rotationY = rotation.value
+                cameraDistance = 24f * density
+            }
     ) {
         AsyncImage(
             model = url,

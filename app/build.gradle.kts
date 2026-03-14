@@ -43,7 +43,6 @@ dependencies {
     implementation(libs.ui.text)
     implementation(libs.androidx.foundation)
     implementation(libs.activity.compose)
-    implementation(libs.lottie.compose)
     implementation(libs.emoji2)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.coil.compose)

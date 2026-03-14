@@ -56,12 +56,15 @@ fun App(
 
     Box(modifier = Modifier.fillMaxSize()) {
 
+/*
         Image(
             painter = painterResource(bgRes),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
         )
+*/
+
 
         MainScreen(
             imageLoader = imageLoader,
