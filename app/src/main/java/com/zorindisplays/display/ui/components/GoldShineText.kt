@@ -33,7 +33,7 @@ fun GoldShineText(
     text: String,
     modifier: Modifier = Modifier,
     fontSize: TextUnit = 64.sp,
-    strokeWidth: Float = 10f,
+    strokeWidth: Float = 20f,
     textAlign: TextAlign = TextAlign.Center,
     shineDurationMs: Int = 1800,
     shineAlpha: Float = 0.45f
@@ -74,7 +74,7 @@ fun GoldShineText(
         BasicText(
             text = text,
             style = baseStyle.copy(
-                color = Color.Black,
+                color = Color(0xFF3a2a18),
                 drawStyle = Stroke(width = strokeWidth)
             )
         )

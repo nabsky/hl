@@ -387,7 +387,6 @@ fun MainScreen(
                     WinKonfettiOverlay(
                         modifier = Modifier
                             .fillMaxSize()
-                            .zIndex(999f)
                     )
 
                     Canvas(
@@ -726,7 +725,7 @@ private fun AmountEntryView(raw: String) {
             GoldShineText(
                 text = formatAmount(raw.toLongOrNull() ?: 0L),
                 fontSize = 72.sp,
-                strokeWidth = 14f
+                strokeWidth = 20f
             )
         }
 
@@ -780,7 +779,7 @@ private fun RoundView(
                         targetAmount = amount,
                         format = ::formatAmount,
                         fontSize = 72.sp,
-                        strokeWidth = 12f,
+                        strokeWidth = 20f,
                         animateOnFirst = false
                     )
                 }
