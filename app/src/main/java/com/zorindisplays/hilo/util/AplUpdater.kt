@@ -2,6 +2,7 @@ package com.zorindisplays.hilo.util
 
 import android.app.DownloadManager
 import android.content.ActivityNotFoundException
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.database.Cursor
@@ -22,6 +23,33 @@ class ApkUpdater(private val context: Context) {
         onProgress: (percent: Int) -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
+        startDownload(
+            url = url,
+            fileName = uniqueFileName(fileName),
+            onProgress = onProgress,
+            onError = onError,
+            retryOnCannotResume = true
+        )
+    }
+
+    private fun startDownload(
+        url: String,
+        fileName: String,
+        onProgress: (percent: Int) -> Unit,
+        onError: (String) -> Unit,
+        retryOnCannotResume: Boolean
+    ) {
+        val targetDir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        if (targetDir == null) {
+            onError("Downloads directory unavailable")
+            return
+        }
+
+        val outFile = File(targetDir, fileName)
+        if (outFile.exists()) {
+            outFile.delete()
+        }
+
         val request = DownloadManager.Request(Uri.parse(url))
             .setTitle("Software Update")
             .setDescription("Downloading update...")
@@ -39,6 +67,7 @@ class ApkUpdater(private val context: Context) {
         val downloadId = dm.enqueue(request)
 
         val handler = Handler(Looper.getMainLooper())
+
         val poll = object : Runnable {
             override fun run() {
                 val query = DownloadManager.Query().setFilterById(downloadId)
@@ -86,6 +115,20 @@ class ApkUpdater(private val context: Context) {
                         DownloadManager.STATUS_FAILED -> {
                             val reason =
                                 it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
+
+                            if (reason == DownloadManager.ERROR_CANNOT_RESUME && retryOnCannotResume) {
+                                // 1008: ERROR_CANNOT_RESUME
+                                outFile.delete()
+                                startDownload(
+                                    url = url,
+                                    fileName = uniqueFileName(fileName),
+                                    onProgress = onProgress,
+                                    onError = onError,
+                                    retryOnCannotResume = false
+                                )
+                                return
+                            }
+
                             onError("Download failed: reason=$reason")
                         }
                     }
@@ -111,7 +154,7 @@ class ApkUpdater(private val context: Context) {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-            clipData = android.content.ClipData.newRawUri("", contentUri)
+            clipData = ClipData.newRawUri("", contentUri)
         }
 
         val resInfoList = appContext.packageManager.queryIntentActivities(
@@ -132,6 +175,17 @@ class ApkUpdater(private val context: Context) {
             appContext.startActivity(intent)
         } catch (_: ActivityNotFoundException) {
             throw IllegalStateException("No package installer found")
+        }
+    }
+
+    private fun uniqueFileName(original: String): String {
+        val dot = original.lastIndexOf('.')
+        return if (dot > 0) {
+            val name = original.substring(0, dot)
+            val ext = original.substring(dot)
+            "${name}_${System.currentTimeMillis()}$ext"
+        } else {
+            "${original}_${System.currentTimeMillis()}"
         }
     }
 }

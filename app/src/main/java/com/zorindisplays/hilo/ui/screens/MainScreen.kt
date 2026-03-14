@@ -69,12 +69,12 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import com.zorindisplays.hilo.util.ApkUpdater
 import com.zorindisplays.hilo.audio.GameSoundManager
 import com.zorindisplays.hilo.ui.WinKonfettiOverlay
 import com.zorindisplays.hilo.ui.components.TableBackground
 import com.zorindisplays.hilo.ui.theme.JackpotTopAmountPadding
 import kotlinx.coroutines.launch
-import com.zorindisplays.hilo.util.ApkUpdater
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlin.math.abs
