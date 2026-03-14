@@ -64,6 +64,7 @@ import java.text.DecimalFormatSymbols
 import java.util.Locale
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -324,9 +325,26 @@ fun MainScreen(
                     else -> 0
                 }
 
+                var visibleWrongCardIndex by remember { mutableStateOf<Int?>(null) }
+
+                LaunchedEffect(state) {
+                    when (val st = state) {
+                        is UiState.Lost -> {
+                            visibleWrongCardIndex = null
+                            delay(1050) // 1000мс flip + чуть буфера
+                            visibleWrongCardIndex = st.revealedCount - 1
+                        }
+
+                        else -> {
+                            visibleWrongCardIndex = null
+                        }
+                    }
+                }
+
                 RoundView(
                     cards = cards,
                     revealedCount = revealedCount,
+                    wrongCardIndex = visibleWrongCardIndex,
                     soundManager = soundManager,
                     imageLoader = imageLoader,
                     guessBubble = guessBubble,
@@ -1058,7 +1076,8 @@ private fun RoundView(
     soundManager: GameSoundManager,
     imageLoader: ImageLoader,
     guessBubble: Guess?,
-    guessBubbleCardIndex: Int?
+    guessBubbleCardIndex: Int?,
+    wrongCardIndex: Int?
 ) {
     Box(Modifier.fillMaxSize()) {
         Row(
@@ -1076,14 +1095,31 @@ private fun RoundView(
                         .width(180.dp)
                         .height(260.dp)
                 ) {
-                    FlipCard(
-                        imageLoader = imageLoader,
-                        faceUp = faceUp,
-                        card = cards.getOrNull(i),
-                        soundManager = soundManager,
+                    val cardShape = RoundedCornerShape(10.dp)
+
+                    Box(
                         modifier = Modifier
                             .matchParentSize()
-                    )
+                            // подгони под реальный размер картинки
+                            .padding(horizontal = 2.dp, vertical = 7.dp)
+                            .clip(cardShape)
+                    ) {
+                        FlipCard(
+                            imageLoader = imageLoader,
+                            faceUp = faceUp,
+                            card = cards.getOrNull(i),
+                            soundManager = soundManager,
+                            modifier = Modifier.matchParentSize()
+                        )
+
+                        if (wrongCardIndex == i) {
+                            WrongCardOverlay(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .zIndex(5f)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1225,4 +1261,78 @@ private fun WinAnimatedAmountOverlay(
         strokeWidth = 20f,
         modifier = modifier
     )
+}
+
+@Composable
+private fun WrongCardOverlay(
+    modifier: Modifier = Modifier
+) {
+    val flashAlpha = remember { Animatable(0f) }
+    val fillAlpha = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        coroutineScope {
+            launch {
+                // быстрая бело-красная вспышка
+                flashAlpha.snapTo(0f)
+                flashAlpha.animateTo(
+                    targetValue = 0.15f,
+                    animationSpec = tween(90)
+                )
+                flashAlpha.animateTo(
+                    targetValue = 0f,
+                    animationSpec = tween(180)
+                )
+            }
+
+            launch {
+                // затем остаётся мягкая красная заливка
+                fillAlpha.snapTo(0f)
+                fillAlpha.animateTo(
+                    targetValue = 0.65f,
+                    animationSpec = tween(260, easing = FastOutSlowInEasing)
+                )
+            }
+        }
+    }
+
+    Box(
+        modifier = modifier
+    ) {
+        // Основная градиентная заливка
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    alpha = fillAlpha.value
+                }
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0x55FF6B6B),
+                            Color(0x99D32F2F),
+                            Color(0xB0A31515)
+                        )
+                    )
+                )
+        )
+
+        // Короткая вспышка поверх
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    alpha = flashAlpha.value
+                }
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.95f),
+                            Color(0xFFFF8A80).copy(alpha = 0.55f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+    }
 }
