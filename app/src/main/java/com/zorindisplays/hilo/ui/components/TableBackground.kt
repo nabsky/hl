@@ -38,37 +38,16 @@ fun TableBackground(isFixedRtp: Boolean) {
         initialValue = 0.92f,
         targetValue = 1.08f,
         animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = 5000,
-                easing = FastOutSlowInEasing
-            ),
+            animation = tween(5000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse"
     )
 
-    // Крупная "тканевая" сетка, одинаковая между recomposition
-    val fabricPattern = remember {
-        val cols = 220
-        val rows = 140
-        Array(rows) { y ->
-            FloatArray(cols) { x ->
-                val base = if ((x + y) % 2 == 0) 1f else -1f
-                val jitter = Random.nextFloat() * 0.35f - 0.175f
-                base + jitter
-            }
-        }
-    }
-
-    // Мелкий шум против banding
     val grainPattern = remember {
         val cols = 260
         val rows = 160
-        Array(rows) {
-            FloatArray(cols) {
-                Random.nextFloat()
-            }
-        }
+        Array(rows) { FloatArray(cols) { Random.nextFloat() } }
     }
 
     Canvas(
@@ -81,10 +60,7 @@ fun TableBackground(isFixedRtp: Boolean) {
 
         drawRect(
             brush = Brush.radialGradient(
-                colors = listOf(
-                    centerColor,
-                    baseColor
-                ),
+                colors = listOf(centerColor, baseColor),
                 center = Offset(w / 2, h / 2),
                 radius = w * 0.9f * pulse
             )
@@ -112,38 +88,30 @@ fun TableBackground(isFixedRtp: Boolean) {
             )
         )
 
-        // Крупная тканевая текстура
-        val fabricCell = 14f
-        val fabricCols = fabricPattern[0].size
-        val fabricRows = fabricPattern.size
+        // Диагональная тканевая фактура
+        val stripeStep = 18f
+        val stripeWidth = 6f
+        var startX = -h
 
-        for (gy in 0 until fabricRows) {
-            val top = gy * fabricCell
-            if (top > h) break
+        while (startX < w + h) {
+            drawLine(
+                color = Color.White.copy(alpha = 0.018f),
+                start = Offset(startX, 0f),
+                end = Offset(startX + h, h),
+                strokeWidth = stripeWidth
+            )
 
-            for (gx in 0 until fabricCols) {
-                val left = gx * fabricCell
-                if (left > w) break
+            drawLine(
+                color = Color.Black.copy(alpha = 0.014f),
+                start = Offset(startX + stripeStep * 0.5f, 0f),
+                end = Offset(startX + stripeStep * 0.5f + h, h),
+                strokeWidth = stripeWidth * 0.8f
+            )
 
-                val value = fabricPattern[gy][gx]
-
-                if (value > 0f) {
-                    drawRect(
-                        color = Color.White.copy(alpha = 0.010f + value * 0.004f),
-                        topLeft = Offset(left, top),
-                        size = Size(fabricCell * 0.52f, fabricCell * 0.52f)
-                    )
-                } else {
-                    drawRect(
-                        color = Color.Black.copy(alpha = 0.012f + (-value) * 0.004f),
-                        topLeft = Offset(left + fabricCell * 0.46f, top + fabricCell * 0.46f),
-                        size = Size(fabricCell * 0.48f, fabricCell * 0.48f)
-                    )
-                }
-            }
+            startX += stripeStep
         }
 
-        // Мелкий grain поверх всего, чтобы убрать круги banding
+        // Мелкий grain против banding
         val grainCell = 8f
         val grainCols = grainPattern[0].size
         val grainRows = grainPattern.size
@@ -158,9 +126,9 @@ fun TableBackground(isFixedRtp: Boolean) {
 
                 val n = grainPattern[gy][gx]
                 val color = if (n > 0.5f) {
-                    Color.White.copy(alpha = 0.018f)
+                    Color.White.copy(alpha = 0.016f)
                 } else {
-                    Color.Black.copy(alpha = 0.018f)
+                    Color.Black.copy(alpha = 0.016f)
                 }
 
                 drawRect(
