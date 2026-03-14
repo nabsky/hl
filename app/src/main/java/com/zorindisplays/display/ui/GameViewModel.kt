@@ -40,6 +40,22 @@ private const val KEY_WINS_COUNT = "wins_count"
 private const val KEY_TOTAL_IN = "total_in"
 private const val KEY_TOTAL_OUT = "total_out"
 
+private const val KEY_GAME_STATE_TYPE = "game_state_type"
+private const val KEY_GAME_RAW = "game_raw"
+private const val KEY_GAME_AMOUNT = "game_amount"
+private const val KEY_GAME_LAST_AMOUNT = "game_last_amount"
+private const val KEY_GAME_REVEALED_COUNT = "game_revealed_count"
+private const val KEY_GAME_AWAITING_GUESS = "game_awaiting_guess"
+private const val KEY_GAME_SHOW_CONFETTI = "game_show_confetti"
+private const val KEY_GAME_CONFETTI_TICK = "game_confetti_tick"
+private const val KEY_GAME_PLAY_COIN_SOUND = "game_play_coin_sound"
+private const val KEY_GAME_PLAY_WINNER_SOUND = "game_play_winner_sound"
+private const val KEY_GAME_CARDS = "game_cards"
+
+private const val KEY_FIXED_SHOULD_WIN = "fixed_should_win"
+private const val KEY_FIXED_SHOULD_WIN_PRESENT = "fixed_should_win_present"
+private const val KEY_FIXED_LOSE_STEP = "fixed_lose_step"
+
 class GameViewModel : ViewModel() {
 
     private val _state = MutableStateFlow<UiState>(UiState.Idle)
@@ -89,7 +105,7 @@ class GameViewModel : ViewModel() {
             totalIn = prefs.getLong(KEY_TOTAL_IN, 0L),
             totalOut = prefs.getLong(KEY_TOTAL_OUT, 0L)
         )
-
+        restoreGameState(context)
         settingsLoaded = true
     }
 
@@ -117,9 +133,11 @@ class GameViewModel : ViewModel() {
 
         if (changed) {
             resetStats()
+            _state.value = UiState.Idle
+            resetFixedRoundState()
         }
 
-        saveSettingsIfPossible()
+        saveAll()
     }
 
     fun setFixedRtpInput(value: String) {
@@ -155,9 +173,11 @@ class GameViewModel : ViewModel() {
 
         if (changed) {
             resetStats()
+            _state.value = UiState.Idle
+            resetFixedRoundState()
         }
 
-        saveSettingsIfPossible()
+        saveAll()
     }
 
     fun getFixedRtpOrDefault(): Double {
@@ -214,6 +234,8 @@ class GameViewModel : ViewModel() {
                 is UiState.Won -> st
             }
         }
+
+        saveGameStateIfPossible()
     }
 
     fun onBackspace() {
@@ -228,6 +250,7 @@ class GameViewModel : ViewModel() {
                 else -> st
             }
         }
+        saveGameStateIfPossible()
     }
 
     fun onEnter() {
@@ -267,6 +290,7 @@ class GameViewModel : ViewModel() {
                 UiState.Idle -> UiState.Idle
             }
         }
+        saveGameStateIfPossible()
     }
 
     fun onStart() {
@@ -288,6 +312,7 @@ class GameViewModel : ViewModel() {
                 else -> st
             }
         }
+        saveGameStateIfPossible()
     }
 
     fun onGuess(guess: Guess) {
@@ -302,6 +327,7 @@ class GameViewModel : ViewModel() {
             DeckMode.RANDOM_DECK -> handleRandomDeckGuess(st, guess)
             DeckMode.FIXED_RTP -> handleFixedRtpGuess(st, guess)
         }
+        saveGameStateIfPossible()
     }
 
     private fun handleRandomDeckGuess(st: UiState.Playing, guess: Guess) {
@@ -586,6 +612,7 @@ class GameViewModel : ViewModel() {
             _state.update { st ->
                 if (st is UiState.Playing) st.copy(showConfetti = false) else st
             }
+            saveGameStateIfPossible()
         }
     }
 
@@ -609,6 +636,7 @@ class GameViewModel : ViewModel() {
                 st
             }
         }
+        saveGameStateIfPossible()
     }
 
     fun onWinnerSoundPlayed() {
@@ -617,6 +645,206 @@ class GameViewModel : ViewModel() {
                 st.copy(playWinnerSound = false)
             } else {
                 st
+            }
+        }
+        saveGameStateIfPossible()
+    }
+
+    private fun saveAll() {
+        saveSettingsIfPossible()
+        saveGameStateIfPossible()
+    }
+
+    private fun saveGameStateIfPossible() {
+        val context = appContext ?: return
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+
+        when (val st = _state.value) {
+            UiState.Idle -> {
+                editor.putString(KEY_GAME_STATE_TYPE, "IDLE")
+                editor.remove(KEY_GAME_RAW)
+                editor.remove(KEY_GAME_AMOUNT)
+                editor.remove(KEY_GAME_LAST_AMOUNT)
+                editor.remove(KEY_GAME_REVEALED_COUNT)
+                editor.remove(KEY_GAME_AWAITING_GUESS)
+                editor.remove(KEY_GAME_SHOW_CONFETTI)
+                editor.remove(KEY_GAME_CONFETTI_TICK)
+                editor.remove(KEY_GAME_PLAY_COIN_SOUND)
+                editor.remove(KEY_GAME_PLAY_WINNER_SOUND)
+                editor.remove(KEY_GAME_CARDS)
+            }
+
+            is UiState.AmountEntry -> {
+                editor.putString(KEY_GAME_STATE_TYPE, "AMOUNT_ENTRY")
+                editor.putString(KEY_GAME_RAW, st.raw)
+                editor.remove(KEY_GAME_AMOUNT)
+                editor.remove(KEY_GAME_LAST_AMOUNT)
+                editor.remove(KEY_GAME_REVEALED_COUNT)
+                editor.remove(KEY_GAME_AWAITING_GUESS)
+                editor.remove(KEY_GAME_SHOW_CONFETTI)
+                editor.remove(KEY_GAME_CONFETTI_TICK)
+                editor.remove(KEY_GAME_PLAY_COIN_SOUND)
+                editor.remove(KEY_GAME_PLAY_WINNER_SOUND)
+                editor.remove(KEY_GAME_CARDS)
+            }
+
+            is UiState.Ready -> {
+                editor.putString(KEY_GAME_STATE_TYPE, "READY")
+                editor.putLong(KEY_GAME_AMOUNT, st.amount)
+                editor.putString(KEY_GAME_CARDS, encodeCards(st.cards))
+                editor.remove(KEY_GAME_LAST_AMOUNT)
+                editor.remove(KEY_GAME_REVEALED_COUNT)
+                editor.remove(KEY_GAME_AWAITING_GUESS)
+                editor.remove(KEY_GAME_SHOW_CONFETTI)
+                editor.remove(KEY_GAME_CONFETTI_TICK)
+                editor.remove(KEY_GAME_PLAY_COIN_SOUND)
+                editor.remove(KEY_GAME_PLAY_WINNER_SOUND)
+            }
+
+            is UiState.Playing -> {
+                editor.putString(KEY_GAME_STATE_TYPE, "PLAYING")
+                editor.putLong(KEY_GAME_AMOUNT, st.amount)
+                editor.putString(KEY_GAME_CARDS, encodeCards(st.cards))
+                editor.putInt(KEY_GAME_REVEALED_COUNT, st.revealedCount)
+                editor.putBoolean(KEY_GAME_AWAITING_GUESS, st.awaitingGuess)
+                editor.putBoolean(KEY_GAME_SHOW_CONFETTI, st.showConfetti)
+                editor.putInt(KEY_GAME_CONFETTI_TICK, st.confettiTick)
+                editor.putBoolean(KEY_GAME_PLAY_COIN_SOUND, st.playCoinSound)
+                editor.remove(KEY_GAME_LAST_AMOUNT)
+                editor.remove(KEY_GAME_PLAY_WINNER_SOUND)
+            }
+
+            is UiState.Lost -> {
+                editor.putString(KEY_GAME_STATE_TYPE, "LOST")
+                editor.putLong(KEY_GAME_LAST_AMOUNT, st.lastAmount)
+                editor.putString(KEY_GAME_CARDS, encodeCards(st.cards))
+                editor.putInt(KEY_GAME_REVEALED_COUNT, st.revealedCount)
+                editor.remove(KEY_GAME_AMOUNT)
+                editor.remove(KEY_GAME_AWAITING_GUESS)
+                editor.remove(KEY_GAME_SHOW_CONFETTI)
+                editor.remove(KEY_GAME_CONFETTI_TICK)
+                editor.remove(KEY_GAME_PLAY_COIN_SOUND)
+                editor.remove(KEY_GAME_PLAY_WINNER_SOUND)
+            }
+
+            is UiState.Won -> {
+                editor.putString(KEY_GAME_STATE_TYPE, "WON")
+                editor.putLong(KEY_GAME_AMOUNT, st.amount)
+                editor.putString(KEY_GAME_CARDS, encodeCards(st.cards))
+                editor.putBoolean(KEY_GAME_PLAY_WINNER_SOUND, false)
+                editor.remove(KEY_GAME_LAST_AMOUNT)
+                editor.remove(KEY_GAME_REVEALED_COUNT)
+                editor.remove(KEY_GAME_AWAITING_GUESS)
+                editor.remove(KEY_GAME_SHOW_CONFETTI)
+                editor.remove(KEY_GAME_CONFETTI_TICK)
+                editor.remove(KEY_GAME_PLAY_COIN_SOUND)
+            }
+        }
+
+        editor.putBoolean(KEY_FIXED_SHOULD_WIN_PRESENT, fixedShouldWin != null)
+        editor.putBoolean(KEY_FIXED_SHOULD_WIN, fixedShouldWin ?: false)
+        editor.putInt(KEY_FIXED_LOSE_STEP, fixedLoseStep)
+
+        editor.apply()
+    }
+
+    private fun restoreGameState(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+        fixedShouldWin = if (prefs.getBoolean(KEY_FIXED_SHOULD_WIN_PRESENT, false)) {
+            prefs.getBoolean(KEY_FIXED_SHOULD_WIN, false)
+        } else {
+            null
+        }
+
+        fixedLoseStep = prefs.getInt(KEY_FIXED_LOSE_STEP, 4)
+
+        val type = prefs.getString(KEY_GAME_STATE_TYPE, "IDLE") ?: "IDLE"
+
+        _state.value = when (type) {
+            "AMOUNT_ENTRY" -> {
+                UiState.AmountEntry(
+                    raw = prefs.getString(KEY_GAME_RAW, "") ?: ""
+                )
+            }
+
+            "READY" -> {
+                val cards = decodeCards(prefs.getString(KEY_GAME_CARDS, null))
+                if (cards.size == 5) {
+                    UiState.Ready(
+                        amount = prefs.getLong(KEY_GAME_AMOUNT, 0L),
+                        cards = cards
+                    )
+                } else {
+                    UiState.Idle
+                }
+            }
+
+            "PLAYING" -> {
+                val cards = decodeCards(prefs.getString(KEY_GAME_CARDS, null))
+                if (cards.size == 5) {
+                    UiState.Playing(
+                        amount = prefs.getLong(KEY_GAME_AMOUNT, 0L),
+                        cards = cards,
+                        revealedCount = prefs.getInt(KEY_GAME_REVEALED_COUNT, 1),
+                        awaitingGuess = prefs.getBoolean(KEY_GAME_AWAITING_GUESS, true),
+                        showConfetti = false,
+                        confettiTick = prefs.getInt(KEY_GAME_CONFETTI_TICK, 0),
+                        playCoinSound = false
+                    )
+                } else {
+                    UiState.Idle
+                }
+            }
+
+            "LOST" -> {
+                val cards = decodeCards(prefs.getString(KEY_GAME_CARDS, null))
+                if (cards.size == 5) {
+                    UiState.Lost(
+                        lastAmount = prefs.getLong(KEY_GAME_LAST_AMOUNT, 0L),
+                        cards = cards,
+                        revealedCount = prefs.getInt(KEY_GAME_REVEALED_COUNT, 1)
+                    )
+                } else {
+                    UiState.Idle
+                }
+            }
+
+            "WON" -> {
+                val cards = decodeCards(prefs.getString(KEY_GAME_CARDS, null))
+                if (cards.size == 5) {
+                    UiState.Won(
+                        amount = prefs.getLong(KEY_GAME_AMOUNT, 0L),
+                        cards = cards,
+                        playWinnerSound = false
+                    )
+                } else {
+                    UiState.Idle
+                }
+            }
+
+            else -> UiState.Idle
+        }
+    }
+
+    private fun encodeCards(cards: List<Card>): String {
+        return cards.joinToString("|") { "${it.rank.name},${it.suit.name}" }
+    }
+
+    private fun decodeCards(raw: String?): List<Card> {
+        if (raw.isNullOrBlank()) return emptyList()
+
+        return raw.split("|").mapNotNull { token ->
+            val parts = token.split(",")
+            if (parts.size != 2) return@mapNotNull null
+
+            try {
+                val rank = com.zorindisplays.display.model.Rank.valueOf(parts[0])
+                val suit = com.zorindisplays.display.model.Suit.valueOf(parts[1])
+                Card(rank = rank, suit = suit)
+            } catch (_: Exception) {
+                null
             }
         }
     }
