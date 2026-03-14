@@ -1,4 +1,4 @@
-package com.zorindisplays.display
+package com.zorindisplays.hilo
 
 import android.os.Build
 import android.os.Bundle
@@ -8,7 +8,7 @@ import android.view.WindowInsetsController
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.view.WindowCompat
-import com.zorindisplays.display.ui.RegistrationGate
+import com.zorindisplays.hilo.ui.RegistrationGate
 
 
 class MainActivity : ComponentActivity() {

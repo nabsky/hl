@@ -1,4 +1,4 @@
-package com.zorindisplays.display.model
+package com.zorindisplays.hilo.model
 
 sealed class UiState {
 

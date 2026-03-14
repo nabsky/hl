@@ -1,4 +1,4 @@
-package com.zorindisplays.display.ui.components
+package com.zorindisplays.hilo.ui.components
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas

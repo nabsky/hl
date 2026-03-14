@@ -1,4 +1,4 @@
-package com.zorindisplays.display.util
+package com.zorindisplays.hilo.util
 
 import android.app.DownloadManager
 import android.content.ActivityNotFoundException
@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper

@@ -1,4 +1,4 @@
-package com.zorindisplays.display
+package com.zorindisplays.hilo
 
 import android.media.MediaPlayer
 import androidx.compose.foundation.Image
@@ -18,11 +18,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.zIndex
-import com.zorindisplays.display.audio.GameSoundManager
-import com.zorindisplays.display.model.UiState
-import com.zorindisplays.display.ui.GameViewModel
-import com.zorindisplays.display.ui.buildSvgImageLoader
-import com.zorindisplays.display.ui.screens.MainScreen
+import com.zorindisplays.hilo.audio.GameSoundManager
+import com.zorindisplays.hilo.model.UiState
+import com.zorindisplays.hilo.ui.GameViewModel
+import com.zorindisplays.hilo.ui.buildSvgImageLoader
+import com.zorindisplays.hilo.ui.screens.MainScreen
 
 @Composable
 fun App(

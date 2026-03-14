@@ -1,4 +1,4 @@
-package com.zorindisplays.display.ui.components
+package com.zorindisplays.hilo.ui.components
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -25,8 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
-import com.zorindisplays.display.ui.theme.Bangers
-import com.zorindisplays.display.ui.theme.Chango
+import com.zorindisplays.hilo.ui.theme.Chango
 
 @Composable
 fun GoldShineText(

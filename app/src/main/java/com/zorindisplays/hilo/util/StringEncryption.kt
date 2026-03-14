@@ -1,4 +1,4 @@
-package com.zorindisplays.display.util
+package com.zorindisplays.hilo.util
 
 import java.security.MessageDigest
 

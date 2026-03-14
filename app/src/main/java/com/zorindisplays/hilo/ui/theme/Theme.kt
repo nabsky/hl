@@ -1,4 +1,4 @@
-package com.zorindisplays.display.ui.theme
+package com.zorindisplays.hilo.ui.theme
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -6,7 +6,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.zorindisplays.display.R
+import com.zorindisplays.hilo.R
 
 // Colors
 val DefaultBackground = Color.Black

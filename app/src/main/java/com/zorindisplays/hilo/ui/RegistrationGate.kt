@@ -1,4 +1,4 @@
-package com.zorindisplays.display.ui
+package com.zorindisplays.hilo.ui
 
 import android.content.Context
 import androidx.compose.foundation.background
@@ -23,10 +23,10 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.zorindisplays.display.ui.theme.DefaultBackground
-import com.zorindisplays.display.ui.theme.DefaultTextStyle
-import com.zorindisplays.display.ui.theme.PrimaryTextColor
-import com.zorindisplays.display.util.StringEncryption
+import com.zorindisplays.hilo.ui.theme.DefaultBackground
+import com.zorindisplays.hilo.ui.theme.DefaultTextStyle
+import com.zorindisplays.hilo.ui.theme.PrimaryTextColor
+import com.zorindisplays.hilo.util.StringEncryption
 import java.util.UUID
 
 private const val PREFS = "app_prefs"

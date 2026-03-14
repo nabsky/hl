@@ -1,11 +1,11 @@
-package com.zorindisplays.display.ui
+package com.zorindisplays.hilo.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
-import com.zorindisplays.display.R
+import com.zorindisplays.hilo.R
 import nl.dionsegijn.konfetti.compose.KonfettiView
 import nl.dionsegijn.konfetti.core.Angle
 import nl.dionsegijn.konfetti.core.Party

@@ -1,14 +1,14 @@
-package com.zorindisplays.display.ui
+package com.zorindisplays.hilo.ui
 
 import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.zorindisplays.display.model.Card
-import com.zorindisplays.display.model.CompareResult
-import com.zorindisplays.display.model.Guess
-import com.zorindisplays.display.model.HiLoEngine
-import com.zorindisplays.display.model.UiState
+import com.zorindisplays.hilo.model.Card
+import com.zorindisplays.hilo.model.CompareResult
+import com.zorindisplays.hilo.model.Guess
+import com.zorindisplays.hilo.model.HiLoEngine
+import com.zorindisplays.hilo.model.UiState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -784,8 +784,8 @@ class GameViewModel : ViewModel() {
             if (parts.size != 2) return@mapNotNull null
 
             try {
-                val rank = com.zorindisplays.display.model.Rank.valueOf(parts[0])
-                val suit = com.zorindisplays.display.model.Suit.valueOf(parts[1])
+                val rank = com.zorindisplays.hilo.model.Rank.valueOf(parts[0])
+                val suit = com.zorindisplays.hilo.model.Suit.valueOf(parts[1])
                 Card(rank = rank, suit = suit)
             } catch (_: Exception) {
                 null

@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.zorindisplays.display"
+    namespace = "com.zorindisplays.hilo"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.zorindisplays.display"
+        applicationId = "com.zorindisplays.hilo"
         minSdk = 24
         targetSdk = 33
         versionCode = 1

@@ -1,9 +1,9 @@
-package com.zorindisplays.display.audio
+package com.zorindisplays.hilo.audio
 
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.SoundPool
-import com.zorindisplays.display.R
+import com.zorindisplays.hilo.R
 
 class GameSoundManager(context: Context) {
 

@@ -1,4 +1,4 @@
-package com.zorindisplays.display.emulator
+package com.zorindisplays.hilo.emulator
 
 class Emulator() {
     //TODO add emulator here for demo mode

@@ -1,10 +1,9 @@
-package com.zorindisplays.display.ui
+package com.zorindisplays.hilo.ui
 
 import android.content.Context
 import coil3.ImageLoader
 import coil3.request.CachePolicy
 import coil3.svg.SvgDecoder
-import coil3.util.DebugLogger
 
 fun buildSvgImageLoader(context: Context): ImageLoader {
     return ImageLoader.Builder(context)

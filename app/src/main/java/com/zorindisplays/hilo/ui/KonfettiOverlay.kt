@@ -1,4 +1,4 @@
-package com.zorindisplays.display.ui
+package com.zorindisplays.hilo.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -13,7 +13,7 @@ import nl.dionsegijn.konfetti.core.models.Size
 import java.util.concurrent.TimeUnit
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
-import com.zorindisplays.display.R
+import com.zorindisplays.hilo.R
 
 
 @Composable

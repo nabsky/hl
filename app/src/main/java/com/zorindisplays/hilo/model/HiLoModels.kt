@@ -1,4 +1,4 @@
-package com.zorindisplays.display.model
+package com.zorindisplays.hilo.model
 
 enum class Suit(val code: String, val symbol: String) {
     CLUBS("c", "♣"),
