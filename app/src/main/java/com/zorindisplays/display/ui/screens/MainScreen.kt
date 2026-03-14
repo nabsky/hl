@@ -64,8 +64,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import com.zorindisplays.display.ui.WinKonfettiOverlay
-import com.zorindisplays.display.ui.components.CoinBurstOverlay
-import com.zorindisplays.display.ui.components.CoinRainOverlay
 import com.zorindisplays.display.ui.components.TableBackground
 import com.zorindisplays.display.ui.theme.JackpotTopAmountPadding
 import kotlinx.coroutines.launch
@@ -147,7 +145,7 @@ fun MainScreen(
                 }
             }
     ) {
-        TableBackground()
+        TableBackground(isFixedRtp = deckMode == DeckMode.FIXED_RTP)
 
 
         AnimatedVisibility(

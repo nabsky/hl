@@ -9,9 +9,21 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 
 @Composable
-fun TableBackground() {
+fun TableBackground(isFixedRtp: Boolean) {
 
     val infinite = rememberInfiniteTransition(label = "table")
+
+    val baseColor = if (isFixedRtp) {
+        Color(0xFF0B3A6E) // синий стол
+    } else {
+        Color(0xFF0F5A36) // зелёный стол
+    }
+
+    val centerColor = if (isFixedRtp) {
+        Color(0xFF1C5FA8)
+    } else {
+        Color(0xFF1E7A4A)
+    }
 
     // мягкое дыхание света
     val pulse by infinite.animateFloat(
@@ -36,15 +48,15 @@ fun TableBackground() {
 
         // базовый стол
         drawRect(
-            color = Color(0xFF0F5A36)
+            color = baseColor
         )
 
         // центральный свет
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0xFF1E7A4A),
-                    Color(0xFF0F5A36)
+                    centerColor,
+                    baseColor
                 ),
                 center = Offset(w / 2, h / 2),
                 radius = w * 0.9f * pulse
