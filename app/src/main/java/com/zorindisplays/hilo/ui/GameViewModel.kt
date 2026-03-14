@@ -224,8 +224,15 @@ class GameViewModel : ViewModel() {
                 UiState.Idle -> UiState.AmountEntry(raw = d.toString())
 
                 is UiState.AmountEntry -> {
+
+                    // лимит 9 цифр
+                    if (st.raw.length >= 9) return@update st
+
                     val newRaw = (st.raw + d.toString()).trimStart('0')
-                    UiState.AmountEntry(raw = if (newRaw.isEmpty()) "0" else newRaw)
+
+                    UiState.AmountEntry(
+                        raw = if (newRaw.isEmpty()) "0" else newRaw
+                    )
                 }
 
                 is UiState.Ready,
