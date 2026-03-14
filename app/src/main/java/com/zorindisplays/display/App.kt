@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.zIndex
+import com.zorindisplays.display.audio.GameSoundManager
 import com.zorindisplays.display.model.UiState
 import com.zorindisplays.display.ui.GameViewModel
 import com.zorindisplays.display.ui.buildSvgImageLoader
@@ -30,6 +31,14 @@ fun App(
     val context = LocalContext.current
     val imageLoader = remember { buildSvgImageLoader(context) }
     val state by vm.state.collectAsState()
+
+    val soundManager = remember { GameSoundManager(context) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            soundManager.release()
+        }
+    }
 
     val fgRes = when (state) {
         UiState.Idle -> null
@@ -47,7 +56,8 @@ fun App(
     Box(modifier = Modifier.fillMaxSize()) {
         MainScreen(
             imageLoader = imageLoader,
-            vm = vm
+            vm = vm,
+            soundManager = soundManager
         )
 
         if(fgRes != null) {
@@ -74,49 +84,24 @@ fun App(
         }
     }
 
-    if (state is UiState.Won && (state as UiState.Won).playWinnerSound) {
-        LaunchedEffect((state as UiState.Won).amount) {
-
-            winPlayer?.release()
-
-            val player = MediaPlayer.create(context, R.raw.win)
-
-            if (player != null) {
-                winPlayer = player
-
-                player.setOnCompletionListener { mp ->
-                    mp.release()
-                    if (winPlayer === mp) winPlayer = null
-                    vm.onWinnerSoundPlayed()
-                }
-
-                player.start()
-            } else {
-                vm.onWinnerSoundPlayed()
-            }
+    if (state is UiState.Playing && (state as UiState.Playing).playCoinSound) {
+        LaunchedEffect((state as UiState.Playing).confettiTick) {
+            soundManager.playCoin()
+            vm.onCoinSoundPlayed()
         }
     }
 
-    if (state is UiState.Playing && (state as UiState.Playing).playCoinSound) {
-        LaunchedEffect((state as UiState.Playing).confettiTick) {
+    if (state is UiState.Won && (state as UiState.Won).playWinnerSound) {
+        LaunchedEffect((state as UiState.Won).amount) {
+            soundManager.playWin()
+            vm.onWinnerSoundPlayed()
+        }
+    }
 
-            coinPlayer?.release()
-
-            val player = MediaPlayer.create(context, R.raw.coins)
-
-            if (player != null) {
-                coinPlayer = player
-
-                player.setOnCompletionListener { mp ->
-                    mp.release()
-                    if (coinPlayer === mp) coinPlayer = null
-                    vm.onCoinSoundPlayed()
-                }
-
-                player.start()
-            } else {
-                vm.onCoinSoundPlayed()
-            }
+    if (state is UiState.Ready && (state as UiState.Ready).playRegisterSound) {
+        LaunchedEffect((state as UiState.Ready).amount) {
+            soundManager.playRegister()
+            vm.onRegisterSoundPlayed()
         }
     }
 }

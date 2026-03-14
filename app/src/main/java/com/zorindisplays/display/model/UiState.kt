@@ -10,7 +10,8 @@ sealed class UiState {
 
     data class Ready(
         val amount: Long,
-        val cards: List<Card>
+        val cards: List<Card>,
+        val playRegisterSound: Boolean = true
     ) : UiState()
 
     data class Playing(

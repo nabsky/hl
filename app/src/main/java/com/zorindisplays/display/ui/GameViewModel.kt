@@ -853,4 +853,12 @@ class GameViewModel : ViewModel() {
 
         return HiLoEngine.drawFiveCards().first()
     }
+
+    fun onRegisterSoundPlayed() {
+        _state.update { st ->
+            if (st is UiState.Ready) {
+                st.copy(playRegisterSound = false)
+            } else st
+        }
+    }
 }

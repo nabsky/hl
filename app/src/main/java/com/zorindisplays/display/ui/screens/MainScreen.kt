@@ -66,6 +66,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import com.zorindisplays.display.audio.GameSoundManager
 import com.zorindisplays.display.ui.WinKonfettiOverlay
 import com.zorindisplays.display.ui.components.TableBackground
 import com.zorindisplays.display.ui.theme.JackpotTopAmountPadding
@@ -76,7 +77,8 @@ import kotlinx.coroutines.coroutineScope
 @Composable
 fun MainScreen(
     imageLoader: ImageLoader,
-    vm: GameViewModel = viewModel()
+    vm: GameViewModel = viewModel(),
+    soundManager: GameSoundManager
 ) {
     val state by vm.state.collectAsState()
     val overlayAmount: Long? = when (val st = state) {
@@ -255,6 +257,7 @@ fun MainScreen(
                 RoundView(
                     cards = cards,
                     revealedCount = revealedCount,
+                    soundManager = soundManager,
                     imageLoader = imageLoader
                 )
             }
@@ -826,6 +829,7 @@ private fun AmountEntryView(raw: String) {
 private fun RoundView(
     cards: List<Card>,
     revealedCount: Int,
+    soundManager: GameSoundManager,
     imageLoader: ImageLoader
 ) {
     Box(Modifier.fillMaxSize()) {
@@ -842,6 +846,7 @@ private fun RoundView(
                     imageLoader = imageLoader,
                     faceUp = faceUp,
                     card = cards.getOrNull(i),
+                    soundManager = soundManager,
                     modifier = Modifier
                         .width(180.dp)
                         .height(260.dp)
@@ -856,6 +861,7 @@ private fun FlipCard(
     imageLoader: ImageLoader,
     faceUp: Boolean,
     card: Card?,
+    soundManager: GameSoundManager,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -864,6 +870,8 @@ private fun FlipCard(
 
     LaunchedEffect(faceUp) {
         if (shownFaceUp == faceUp) return@LaunchedEffect
+
+        soundManager.playFlip()
 
         rotation.animateTo(
             targetValue = 90f,
