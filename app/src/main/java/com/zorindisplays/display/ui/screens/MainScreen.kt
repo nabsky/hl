@@ -486,7 +486,7 @@ fun MainScreen(
                         GoldShineText(
                             text = bottomOverlayText,
                             fontSize = 36.sp,
-                            strokeWidth = 6f
+                            strokeWidth = 10f
                         )
                     } else {
                         BasicText(
@@ -796,8 +796,8 @@ fun MainScreen(
                     AnimatedAmountText(
                         targetAmount = overlayAmount,
                         format = ::formatAmount,
-                        fontSize = 80.sp,
-                        strokeWidth = 12f,
+                        fontSize = 72.sp,
+                        strokeWidth = 20f,
                         animateOnFirst = false
                     )
                 }
