@@ -719,8 +719,8 @@ fun MainScreen(
         }
 
         if (overlayAmount != null) {
-
             val isWon = state is UiState.Won
+            val isLost = state is UiState.Lost
 
             val scale by rememberInfiniteTransition(label = "amountPulse")
                 .animateFloat(
@@ -733,6 +733,37 @@ fun MainScreen(
                     label = "amountScale"
                 )
 
+            val amountOffsetY = remember { Animatable(0f) }
+            val amountAlpha = remember { Animatable(1f) }
+
+            LaunchedEffect(state) {
+                if (isLost) {
+                    amountOffsetY.snapTo(0f)
+                    amountAlpha.snapTo(1f)
+
+                    coroutineScope {
+                        launch {
+                            amountOffsetY.animateTo(
+                                targetValue = 900f,
+                                animationSpec = tween(
+                                    durationMillis = 380,
+                                    easing = FastOutSlowInEasing
+                                )
+                            )
+                        }
+                        launch {
+                            amountAlpha.animateTo(
+                                targetValue = 0f,
+                                animationSpec = tween(320)
+                            )
+                        }
+                    }
+                } else {
+                    amountOffsetY.snapTo(0f)
+                    amountAlpha.snapTo(1f)
+                }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -742,14 +773,14 @@ fun MainScreen(
                 Box(
                     modifier = Modifier
                         .padding(top = JackpotTopAmountPadding)
+                        .offset(y = amountOffsetY.value.dp)
                         .graphicsLayer {
                             scaleX = scale
                             scaleY = scale
+                            alpha = amountAlpha.value
                         }
                 ) {
-
                     if (isWon) {
-
                         Canvas(
                             modifier = Modifier
                                 .size(420.dp)
@@ -774,8 +805,8 @@ fun MainScreen(
                         AnimatedAmountText(
                             targetAmount = overlayAmount,
                             format = ::formatAmount,
-                            fontSize = 72.sp,
-                            strokeWidth = 20f,
+                            fontSize = 80.sp,
+                            strokeWidth = 12f,
                             animateOnFirst = false
                         )
                     }
