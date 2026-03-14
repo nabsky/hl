@@ -3,6 +3,7 @@ package com.zorindisplays.hilo.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -370,15 +371,15 @@ fun MainScreen(
                         launch {
                             trophyRotation.animateTo(
                                 targetValue = 0f,
-                                animationSpec = tween(520, easing = FastOutSlowInEasing)
+                                animationSpec = tween(360, easing = LinearOutSlowInEasing)
                             )
                         }
 
                         launch {
                             // Сразу растёт во время падения, без паузы после приземления
                             trophyScale.animateTo(
-                                targetValue = 1.08f,
-                                animationSpec = tween(620, easing = FastOutSlowInEasing)
+                                targetValue = 1.12f,
+                                animationSpec = tween(420, easing = LinearOutSlowInEasing)
                             )
                             trophyScale.animateTo(
                                 targetValue = 1f,
@@ -387,18 +388,18 @@ fun MainScreen(
                         }
 
                         trophyOffsetY.animateTo(
-                            targetValue = 34f,
+                            targetValue = 28f,
                             animationSpec = tween(
-                                durationMillis = 620,
-                                easing = FastOutSlowInEasing
+                                durationMillis = 420,
+                                easing = LinearOutSlowInEasing
                             )
                         )
 
                         trophyOffsetY.animateTo(
                             targetValue = 0f,
                             animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessLow
+                                dampingRatio = 0.55f,
+                                stiffness = 520f
                             )
                         )
 
