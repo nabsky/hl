@@ -223,6 +223,17 @@ fun MainScreen(
     ) {
         TableBackground(isFixedRtp = deckMode == DeckMode.FIXED_RTP)
 
+        Text(
+            text = "ALL VALUES IN CFA",
+            fontSize = 14.sp,
+            letterSpacing = 1.sp,
+            color = Color.White.copy(alpha = 0.55f),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 18.dp, end = 22.dp)
+                .zIndex(5000f)
+        )
+
 
         AnimatedVisibility(
             visible = showTopTokens,
