@@ -535,6 +535,7 @@ fun MainScreen(
                 ) {
                     if (state is UiState.Won) {
                         GoldShineText(
+                            modifier = Modifier.offset(x = 10.dp),
                             text = bottomOverlayText,
                             fontSize = 42.sp,
                             strokeWidth = 20f
@@ -726,11 +727,11 @@ fun MainScreen(
                                     updateProgress = 0
                                     updateStatus = "Preparing update..."
 
-                                    val url = "https://nabsky.bitbucket.io/higherlower/$code.apk"
+                                    val url = "https://nabsky.bitbucket.io/baccarat/$code.apk"
 
                                     updater.downloadAndInstall(
                                         url = url,
-                                        fileName = "higherlower_update.apk",
+                                        fileName = "update.apk",
                                         onProgress = { percent ->
                                             updateProgress = percent
                                         }
