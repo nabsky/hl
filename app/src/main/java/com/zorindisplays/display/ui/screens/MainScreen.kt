@@ -101,6 +101,20 @@ fun MainScreen(
     var updateInProgress by remember { mutableStateOf(false) }
     val tokensPainter = painterResource(R.drawable.tokens)
 
+    val isFixedRtpMode = deckMode == DeckMode.FIXED_RTP
+
+    val trophyGlowMain = if (isFixedRtpMode) {
+        Color(0x8859A8FF)
+    } else {
+        Color(0x88FFD54A)
+    }
+
+    val trophyGlowSecondary = if (isFixedRtpMode) {
+        Color(0x224C8DFF)
+    } else {
+        Color(0x33FFD54A)
+    }
+
     val versionName = remember {
         try {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unknown"
@@ -235,20 +249,13 @@ fun MainScreen(
                     else -> null
                 }
 
-                val bottomText = when (st) {
-                    is UiState.Ready -> "PRESS START TO BEGIN"
-                    is UiState.Playing -> if (st.awaitingGuess) "HIGHER OR LOWER" else ""
-                    is UiState.Lost -> "BETTER LUCK NEXT TIME!"
-                    is UiState.Won -> "YOU WON!"
-                    else -> ""
-                }
-
                 RoundView(
                     amount = amount,
                     cards = cards,
                     revealedCount = revealedCount,
-                    bottomText = bottomText,
-                    imageLoader = imageLoader
+                    imageLoader = imageLoader,
+                    isLoseScreen = st is UiState.Lost,
+                    isWonScreen = st is UiState.Won
                 )
             }
         }
@@ -395,8 +402,8 @@ fun MainScreen(
                         drawCircle(
                             brush = Brush.radialGradient(
                                 colors = listOf(
-                                    Color(0x88FFD54A),
-                                    Color(0x33FFD54A),
+                                    trophyGlowMain,
+                                    trophyGlowSecondary,
                                     Color.Transparent
                                 )
                             ),
@@ -451,6 +458,44 @@ fun MainScreen(
                             }
                             .size(420.dp)
                     )
+                }
+            }
+        }
+
+
+        val bottomOverlayText = when (val st = state) {
+            is UiState.Ready -> "PRESS START TO BEGIN"
+            is UiState.Playing -> if (st.awaitingGuess) "HIGHER OR LOWER" else ""
+            is UiState.Lost -> "BETTER LUCK NEXT TIME!"
+            is UiState.Won -> "YOU WON!"
+            else -> ""
+        }
+
+        if (bottomOverlayText.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(2000f),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Box(
+                    modifier = Modifier.padding(bottom = 24.dp)
+                ) {
+                    if (state is UiState.Won) {
+                        GoldShineText(
+                            text = bottomOverlayText,
+                            fontSize = 36.sp,
+                            strokeWidth = 6f
+                        )
+                    } else {
+                        BasicText(
+                            text = bottomOverlayText,
+                            style = DefaultTextStyle.copy(
+                                fontSize = 36.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        )
+                    }
                 }
             }
         }
@@ -744,11 +789,10 @@ private fun RoundView(
     amount: Long?,
     cards: List<Card>,
     revealedCount: Int,
-    bottomText: String,
-    imageLoader: ImageLoader
+    imageLoader: ImageLoader,
+    isLoseScreen: Boolean,
+    isWonScreen: Boolean
 ) {
-    val isLoseScreen = bottomText == "BETTER LUCK NEXT TIME!"
-
     var showAmount by remember { mutableStateOf(true) }
 
     LaunchedEffect(isLoseScreen) {
@@ -802,20 +846,6 @@ private fun RoundView(
                         .height(260.dp)
                 )
             }
-        }
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 24.dp)
-        ) {
-            BasicText(
-                text = bottomText,
-                style = DefaultTextStyle.copy(
-                    fontSize = 36.sp,
-                    textAlign = TextAlign.Center
-                )
-            )
         }
     }
 }

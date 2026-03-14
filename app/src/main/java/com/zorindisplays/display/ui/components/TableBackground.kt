@@ -10,13 +10,12 @@ import androidx.compose.ui.graphics.*
 
 @Composable
 fun TableBackground(isFixedRtp: Boolean) {
-
     val infinite = rememberInfiniteTransition(label = "table")
 
     val baseColor = if (isFixedRtp) {
-        Color(0xFF0B3A6E) // синий стол
+        Color(0xFF0B3A6E)
     } else {
-        Color(0xFF0F5A36) // зелёный стол
+        Color(0xFF0F5A36)
     }
 
     val centerColor = if (isFixedRtp) {
@@ -25,7 +24,6 @@ fun TableBackground(isFixedRtp: Boolean) {
         Color(0xFF1E7A4A)
     }
 
-    // мягкое дыхание света
     val pulse by infinite.animateFloat(
         initialValue = 0.92f,
         targetValue = 1.08f,
@@ -42,16 +40,11 @@ fun TableBackground(isFixedRtp: Boolean) {
     Canvas(
         modifier = Modifier.fillMaxSize()
     ) {
-
         val w = size.width
         val h = size.height
 
-        // базовый стол
-        drawRect(
-            color = baseColor
-        )
+        drawRect(color = baseColor)
 
-        // центральный свет
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
@@ -63,7 +56,6 @@ fun TableBackground(isFixedRtp: Boolean) {
             )
         )
 
-        // прожектор сверху
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
@@ -75,7 +67,6 @@ fun TableBackground(isFixedRtp: Boolean) {
             )
         )
 
-        // дополнительное мягкое свечение центра
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
@@ -87,7 +78,6 @@ fun TableBackground(isFixedRtp: Boolean) {
             )
         )
 
-        // виньетка
         drawRect(
             brush = Brush.radialGradient(
                 colors = listOf(
