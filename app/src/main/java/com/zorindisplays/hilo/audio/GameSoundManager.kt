@@ -57,7 +57,7 @@ class GameSoundManager(context: Context) {
             start()
         }
 
-        // fade-in громкости
+        // Fade-in
         Thread {
             val steps = 20
             val maxVolume = 0.6f
@@ -67,11 +67,36 @@ class GameSoundManager(context: Context) {
                 kalimbaPlayer?.setVolume(v, v)
                 Thread.sleep(50)
             }
+
+            startStereoDrift(maxVolume)
+
         }.start()
     }
 
     fun stopKalimbaLoop() {
         kalimbaPlayer?.release()
         kalimbaPlayer = null
+    }
+
+    private fun startStereoDrift(baseVolume: Float) {
+
+        Thread {
+
+            var phase = 0.0
+
+            while (kalimbaPlayer != null) {
+
+                val drift = (Math.sin(phase) * 0.15f).toFloat()
+
+                val left = (baseVolume + drift).coerceIn(0f, 1f)
+                val right = (baseVolume - drift).coerceIn(0f, 1f)
+
+                kalimbaPlayer?.setVolume(left, right)
+
+                phase += 0.08
+                Thread.sleep(60)
+            }
+
+        }.start()
     }
 }
