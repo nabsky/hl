@@ -110,6 +110,22 @@ class ApkUpdater(private val context: Context) {
             setDataAndType(contentUri, "application/vnd.android.package-archive")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            clipData = android.content.ClipData.newRawUri("", contentUri)
+        }
+
+        val resInfoList = appContext.packageManager.queryIntentActivities(
+            intent,
+            android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
+        )
+
+        for (resolveInfo in resInfoList) {
+            val packageName = resolveInfo.activityInfo.packageName
+            appContext.grantUriPermission(
+                packageName,
+                contentUri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
         }
 
         try {
