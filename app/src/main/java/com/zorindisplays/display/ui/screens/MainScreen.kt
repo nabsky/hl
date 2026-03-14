@@ -6,6 +6,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
@@ -73,6 +74,8 @@ import com.zorindisplays.display.ui.theme.JackpotTopAmountPadding
 import kotlinx.coroutines.launch
 import com.zorindisplays.display.util.ApkUpdater
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlin.math.abs
 
 @Composable
 fun MainScreen(
@@ -107,6 +110,10 @@ fun MainScreen(
     val scope = rememberCoroutineScope()
     val updater = remember { ApkUpdater(context) }
 
+    var guessBubble by remember { mutableStateOf<Guess?>(null) }
+    var guessBubbleCardIndex by remember { mutableStateOf<Int?>(null) }
+    var guessSubmitPending by remember { mutableStateOf(false) }
+
     var showUpdateDialog by remember { mutableStateOf(false) }
     var updateCode by remember { mutableStateOf("") }
     var updateStatus by remember { mutableStateOf("") }
@@ -136,6 +143,46 @@ fun MainScreen(
         }
     }
 
+
+    fun submitGuessWithBubble(guess: Guess) {
+        val playing = state as? UiState.Playing ?: return
+        if (!playing.awaitingGuess) return
+        if (playing.revealedCount >= 5) return
+        if (guessSubmitPending) return
+
+        guessSubmitPending = true
+        guessBubble = guess
+        guessBubbleCardIndex = playing.revealedCount
+
+        scope.launch {
+            delay(150)   // зритель успевает увидеть выбор до флипа
+            vm.onGuess(guess)
+
+            delay(1100)  // 1000мс flip + чуть буфера
+
+            val newState = vm.state.value
+            if (newState !is UiState.Lost) {
+                guessBubble = null
+                guessBubbleCardIndex = null
+            }
+
+            guessSubmitPending = false
+        }
+    }
+
+    LaunchedEffect(state) {
+        when (state) {
+            UiState.Idle,
+            is UiState.AmountEntry,
+            is UiState.Ready -> {
+                guessBubble = null
+                guessBubbleCardIndex = null
+                guessSubmitPending = false
+            }
+            else -> Unit
+        }
+    }
+
     LaunchedEffect(Unit) {
         vm.loadSettings(context)
     }
@@ -152,8 +199,8 @@ fun MainScreen(
                     Key.Enter -> { vm.onEnter(); true }
                     Key.Backspace -> { vm.onBackspace(); true }
                     Key.S -> { vm.onStart(); true }
-                    Key.H -> { vm.onGuess(Guess.HIGHER); true }
-                    Key.L -> { vm.onGuess(Guess.LOWER); true }
+                    Key.H -> { submitGuessWithBubble(Guess.HIGHER); true }
+                    Key.L -> { submitGuessWithBubble(Guess.LOWER); true }
                     Key.R -> { showDeckModeDialog = true; true }
                     Key.U -> { showUpdateDialog = true; true }
 
@@ -258,7 +305,9 @@ fun MainScreen(
                     cards = cards,
                     revealedCount = revealedCount,
                     soundManager = soundManager,
-                    imageLoader = imageLoader
+                    imageLoader = imageLoader,
+                    guessBubble = guessBubble,
+                    guessBubbleCardIndex = guessBubbleCardIndex
                 )
             }
         }
@@ -284,7 +333,7 @@ fun MainScreen(
 
             LaunchedEffect(isWon) {
                 showTrophy = false
-                kotlinx.coroutines.delay(250)
+                delay(250)
                 showTrophy = true
             }
 
@@ -358,21 +407,21 @@ fun MainScreen(
                         }
 
                         launch {
-                            kotlinx.coroutines.delay(120)
+                            delay(120)
                             sparkLeftAlpha.animateTo(1f, tween(100))
                             sparkLeftOffset.animateTo(-30f, tween(450, easing = FastOutSlowInEasing))
                             sparkLeftAlpha.animateTo(0f, tween(220))
                         }
 
                         launch {
-                            kotlinx.coroutines.delay(170)
+                            delay(170)
                             sparkRightAlpha.animateTo(1f, tween(100))
                             sparkRightOffset.animateTo(30f, tween(450, easing = FastOutSlowInEasing))
                             sparkRightAlpha.animateTo(0f, tween(220))
                         }
 
                         launch {
-                            kotlinx.coroutines.delay(90)
+                            delay(90)
                             sparkTopAlpha.animateTo(1f, tween(100))
                             sparkTopOffset.animateTo(-26f, tween(420, easing = FastOutSlowInEasing))
                             sparkTopAlpha.animateTo(0f, tween(220))
@@ -487,8 +536,8 @@ fun MainScreen(
                     if (state is UiState.Won) {
                         GoldShineText(
                             text = bottomOverlayText,
-                            fontSize = 36.sp,
-                            strokeWidth = 10f
+                            fontSize = 42.sp,
+                            strokeWidth = 20f
                         )
                     } else {
                         BasicText(
@@ -861,7 +910,9 @@ private fun RoundView(
     cards: List<Card>,
     revealedCount: Int,
     soundManager: GameSoundManager,
-    imageLoader: ImageLoader
+    imageLoader: ImageLoader,
+    guessBubble: Guess?,
+    guessBubbleCardIndex: Int?
 ) {
     Box(Modifier.fillMaxSize()) {
         Row(
@@ -873,16 +924,62 @@ private fun RoundView(
         ) {
             repeat(5) { i ->
                 val faceUp = i < revealedCount
-                FlipCard(
-                    imageLoader = imageLoader,
-                    faceUp = faceUp,
-                    card = cards.getOrNull(i),
-                    soundManager = soundManager,
+
+                Box(
                     modifier = Modifier
                         .width(180.dp)
                         .height(260.dp)
-                )
+                ) {
+                    FlipCard(
+                        imageLoader = imageLoader,
+                        faceUp = faceUp,
+                        card = cards.getOrNull(i),
+                        soundManager = soundManager,
+                        modifier = Modifier
+                            .matchParentSize()
+                    )
+                }
             }
+        }
+        if (guessBubble != null && guessBubbleCardIndex != null) {
+            val cardWidth = 180.dp
+            val spacing = 24.dp
+            val cardCount = 5
+            val index = guessBubbleCardIndex
+
+            val rowWidth = cardWidth * cardCount + spacing * (cardCount - 1)
+
+            val cardCenterX = -rowWidth / 2 + cardWidth / 2 + (cardWidth + spacing) * index
+
+            val isHigher = guessBubble == Guess.HIGHER
+
+            val bubbleX = cardCenterX + if (isHigher) 100.dp else (-100).dp
+            val bubbleY = if (isHigher) (-120).dp else 120.dp
+
+            val scale by animateFloatAsState(
+                targetValue = 1f,
+                animationSpec = spring(
+                    dampingRatio = 0.5f,
+                    stiffness = 300f
+                ),
+                label = "guessBubbleScale"
+            )
+
+            Image(
+                painter = painterResource(
+                    if (isHigher) R.drawable.higher else R.drawable.lower
+                ),
+                contentDescription = null,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(x = bubbleX, y = bubbleY)
+                    .width(160.dp)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                    }
+                    .zIndex(50f)
+            )
         }
     }
 }
@@ -920,7 +1017,7 @@ private fun FlipCard(
 
     val url = if (shownFaceUp && card != null) card.assetUrl() else cardBackAssetUrl()
 
-    val isAnimating = kotlin.math.abs(rotation.value) > 0.5f
+    val isAnimating = abs(rotation.value) > 0.5f
 
     Box(
         modifier = modifier
