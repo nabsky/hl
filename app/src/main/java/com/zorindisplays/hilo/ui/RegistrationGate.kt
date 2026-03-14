@@ -42,7 +42,7 @@ fun RegistrationGate(
 
     var installationId by remember { mutableStateOf("") }
     var expectedCode by remember { mutableStateOf<String?>(null) }
-    var registered by remember { mutableStateOf(false) }
+    var registered by remember { mutableStateOf<Boolean?>(null) }
 
     fun recalcState() {
         var id = prefs.getString(KEY_INSTALLATION_ID, null)
@@ -58,12 +58,14 @@ fun RegistrationGate(
         registered = expectedCode != null && expectedCode.equals(saved, ignoreCase = true)
     }
 
-    LaunchedEffect(Unit) { recalcState() }
+    LaunchedEffect(Unit) {
+        recalcState()
+    }
 
     Box(Modifier.fillMaxSize()) {
         content()
 
-        if (!registered) {
+        if (registered == false) {
             RegistrationOverlay(
                 installationId = installationId,
                 onSubmit = { code ->
