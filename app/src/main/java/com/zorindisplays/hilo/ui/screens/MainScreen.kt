@@ -5,7 +5,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -69,15 +68,21 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-import com.zorindisplays.hilo.util.ApkUpdater
+import com.zorindisplays.hilo.util.ApkDownloadManagerUpdater
 import com.zorindisplays.hilo.audio.GameSoundManager
 import com.zorindisplays.hilo.ui.WinKonfettiOverlay
 import com.zorindisplays.hilo.ui.components.TableBackground
 import com.zorindisplays.hilo.ui.theme.JackpotTopAmountPadding
+import com.zorindisplays.hilo.util.ApkOkHttpUpdater
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlin.math.abs
+
+enum class UpdateMethod {
+    DOWNLOAD_MANAGER,
+    OKHTTP
+}
 
 @Composable
 fun MainScreen(
@@ -110,13 +115,18 @@ fun MainScreen(
     val context = LocalContext.current
 
     val scope = rememberCoroutineScope()
-    val updater = remember { ApkUpdater(context) }
+    val updater = remember { ApkDownloadManagerUpdater(context) }
 
     var guessBubble by remember { mutableStateOf<Guess?>(null) }
     var guessBubbleCardIndex by remember { mutableStateOf<Int?>(null) }
     var guessSubmitPending by remember { mutableStateOf(false) }
 
+
     var showUpdateDialog by remember { mutableStateOf(false) }
+    val downloadManagerUpdater = remember { ApkDownloadManagerUpdater(context) }
+    val okHttpUpdater = remember { ApkOkHttpUpdater(context) }
+    var updateMethod by remember { mutableStateOf(UpdateMethod.DOWNLOAD_MANAGER) }
+
     var updateCode by remember { mutableStateOf("") }
     var updateStatus by remember { mutableStateOf("") }
     var updateProgress by remember { mutableStateOf(0) }
@@ -789,6 +799,40 @@ fun MainScreen(
                         if (updateStatus.isNotEmpty()) {
                             Text(updateStatus)
                         }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = updateMethod == UpdateMethod.DOWNLOAD_MANAGER,
+                                    onClick = {
+                                        if (!updateInProgress) {
+                                            updateMethod = UpdateMethod.DOWNLOAD_MANAGER
+                                        }
+                                    }
+                                )
+                                Text("Download Manager")
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = updateMethod == UpdateMethod.OKHTTP,
+                                    onClick = {
+                                        if (!updateInProgress) {
+                                            updateMethod = UpdateMethod.OKHTTP
+                                        }
+                                    }
+                                )
+                                Text("OkHTTP")
+                            }
+                        }
                     }
                 },
                 confirmButton = {
@@ -801,40 +845,50 @@ fun MainScreen(
                                 return@Button
                             }
 
-                            scope.launch {
-                                try {
-                                    updateInProgress = true
-                                    updateProgress = 0
-                                    updateStatus = "Preparing update..."
+                            try {
+                                updateInProgress = true
+                                updateProgress = 0
+                                updateStatus = "Preparing update..."
 
-                                    val url = "https://nabsky.bitbucket.io/baccarat/$code.apk"
+                                val url = "https://nabsky.bitbucket.io/baccarat/$code.apk"
 
-                                    updateInProgress = true
-                                    updateProgress = 0
-                                    updateStatus = "Preparing update..."
-
-                                    updater.downloadAndInstall(
-                                        url = url,
-                                        fileName = "update.apk",
-                                        onProgress = { percent ->
-                                            updateProgress = percent
-                                        },
-                                        onError = { error ->
-                                            updateInProgress = false
-                                            updateStatus = error
-                                        }
-                                    )
-
-                                    showUpdateDialog = false
-                                    updateCode = ""
-                                    updateStatus = ""
-                                    updateProgress = 0
-                                    updateInProgress = false
-                                } catch (t: Throwable) {
-                                    updateStatus = t.message ?: "Update failed"
-                                } finally {
-                                    updateInProgress = false
+                                val onProgress: (Int) -> Unit = { percent ->
+                                    updateProgress = percent
                                 }
+
+                                val onError: (String) -> Unit = { error ->
+                                    updateInProgress = false
+                                    updateStatus = error
+                                }
+
+                                when (updateMethod) {
+                                    UpdateMethod.DOWNLOAD_MANAGER -> {
+                                        downloadManagerUpdater.downloadAndInstall(
+                                            url = url,
+                                            fileName = "update.apk",
+                                            onProgress = onProgress,
+                                            onError = onError
+                                        )
+                                    }
+
+                                    UpdateMethod.OKHTTP -> {
+                                        okHttpUpdater.downloadAndInstall(
+                                            url = url,
+                                            fileName = "update.apk",
+                                            onProgress = onProgress,
+                                            onError = onError
+                                        )
+                                    }
+                                }
+
+                                showUpdateDialog = false
+                                updateCode = ""
+                                updateStatus = ""
+                                updateProgress = 0
+                                updateInProgress = false
+                            } catch (t: Throwable) {
+                                updateStatus = t.message ?: "Update failed"
+                                updateInProgress = false
                             }
                         }
                     ) {

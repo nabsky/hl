@@ -7,15 +7,15 @@ import android.content.Context
 import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
-import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.FileProvider
 import java.io.File
 
-class ApkUpdater(private val context: Context) {
+class ApkDownloadManagerUpdater(private val context: Context) {
 
     private val appContext = context.applicationContext
+    private var currentDownloadId: Long? = null
 
     fun downloadAndInstall(
         url: String,
@@ -39,7 +39,14 @@ class ApkUpdater(private val context: Context) {
         onError: (String) -> Unit,
         retryOnCannotResume: Boolean
     ) {
-        val targetDir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        val dm = appContext.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+
+        currentDownloadId?.let { oldId ->
+            dm.remove(oldId)
+            currentDownloadId = null
+        }
+
+        val targetDir = appContext.getExternalFilesDir(null)
         if (targetDir == null) {
             onError("Downloads directory unavailable")
             return
@@ -59,12 +66,12 @@ class ApkUpdater(private val context: Context) {
             .setMimeType("application/vnd.android.package-archive")
             .setDestinationInExternalFilesDir(
                 appContext,
-                Environment.DIRECTORY_DOWNLOADS,
+                null,
                 fileName
             )
 
-        val dm = appContext.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val downloadId = dm.enqueue(request)
+        currentDownloadId = downloadId
 
         val handler = Handler(Looper.getMainLooper())
 
@@ -100,6 +107,7 @@ class ApkUpdater(private val context: Context) {
                         }
 
                         DownloadManager.STATUS_SUCCESSFUL -> {
+                            currentDownloadId = null
                             onProgress(100)
 
                             val localUri =
@@ -113,19 +121,24 @@ class ApkUpdater(private val context: Context) {
                         }
 
                         DownloadManager.STATUS_FAILED -> {
+                            currentDownloadId = null
+
                             val reason =
                                 it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
 
                             if (reason == DownloadManager.ERROR_CANNOT_RESUME && retryOnCannotResume) {
-                                // 1008: ERROR_CANNOT_RESUME
                                 outFile.delete()
-                                startDownload(
-                                    url = url,
-                                    fileName = uniqueFileName(fileName),
-                                    onProgress = onProgress,
-                                    onError = onError,
-                                    retryOnCannotResume = false
-                                )
+
+                                handler.postDelayed({
+                                    startDownload(
+                                        url = url,
+                                        fileName = uniqueFileName(fileName),
+                                        onProgress = onProgress,
+                                        onError = onError,
+                                        retryOnCannotResume = false
+                                    )
+                                }, 500)
+
                                 return
                             }
 
