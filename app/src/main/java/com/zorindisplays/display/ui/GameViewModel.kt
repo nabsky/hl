@@ -367,7 +367,7 @@ class GameViewModel : ViewModel() {
                 when {
                     shouldWinRound -> {
                         val wantHigher = guess == Guess.HIGHER
-                        val generated = drawCardRelativeTo(
+                        val generated = drawCardRelativeToWithoutEqualRank(
                             prev = prev,
                             wantHigher = wantHigher,
                             exclude = fixedUsedCards
@@ -379,7 +379,7 @@ class GameViewModel : ViewModel() {
 
                     currentGuessStep == fixedLoseStep -> {
                         val wantHigher = guess != Guess.HIGHER
-                        val generated = drawCardRelativeTo(
+                        val generated = drawCardRelativeToWithoutEqualRank(
                             prev = prev,
                             wantHigher = wantHigher,
                             exclude = fixedUsedCards
@@ -390,7 +390,7 @@ class GameViewModel : ViewModel() {
                     }
 
                     else -> {
-                        val generated = drawRandomNonTieCardRelativeTo(
+                        val generated = drawRandomNonTieAndNonEqualRankCardRelativeTo(
                             prev = prev,
                             exclude = fixedUsedCards
                         )
@@ -547,62 +547,6 @@ class GameViewModel : ViewModel() {
             fallback = HiLoEngine.drawFiveCards().random()
         }
         return fallback
-    }
-
-    private fun drawCardRelativeTo(
-        prev: Card,
-        wantHigher: Boolean,
-        exclude: Set<Card>
-    ): Card {
-        repeat(5000) {
-            val candidate = HiLoEngine.drawFiveCards().random()
-
-            if (candidate in exclude) return@repeat
-
-            when (HiLoEngine.compare(prev, candidate)) {
-                CompareResult.HIGHER -> if (wantHigher) return candidate
-                CompareResult.LOWER -> if (!wantHigher) return candidate
-                CompareResult.TIE -> { }
-            }
-        }
-
-        repeat(5000) {
-            val candidate = HiLoEngine.drawFiveCards().random()
-
-            when (HiLoEngine.compare(prev, candidate)) {
-                CompareResult.HIGHER -> if (wantHigher) return candidate
-                CompareResult.LOWER -> if (!wantHigher) return candidate
-                CompareResult.TIE -> { }
-            }
-        }
-
-        return HiLoEngine.drawFiveCards().first()
-    }
-
-    private fun drawRandomNonTieCardRelativeTo(
-        prev: Card,
-        exclude: Set<Card>
-    ): Card {
-        repeat(5000) {
-            val candidate = HiLoEngine.drawFiveCards().random()
-
-            if (candidate in exclude) return@repeat
-
-            when (HiLoEngine.compare(prev, candidate)) {
-                CompareResult.HIGHER, CompareResult.LOWER -> return candidate
-                CompareResult.TIE -> { }
-            }
-        }
-
-        repeat(5000) {
-            val candidate = HiLoEngine.drawFiveCards().random()
-            when (HiLoEngine.compare(prev, candidate)) {
-                CompareResult.HIGHER, CompareResult.LOWER -> return candidate
-                CompareResult.TIE -> { }
-            }
-        }
-
-        return HiLoEngine.drawFiveCards().first()
     }
 
     private fun scheduleConfettiOff() {
@@ -847,5 +791,66 @@ class GameViewModel : ViewModel() {
                 null
             }
         }
+    }
+
+    private fun drawRandomNonTieAndNonEqualRankCardRelativeTo(
+        prev: Card,
+        exclude: Set<Card>
+    ): Card {
+        repeat(5000) {
+            val candidate = HiLoEngine.drawFiveCards().random()
+
+            if (candidate in exclude) return@repeat
+            if (candidate.rank == prev.rank) return@repeat
+
+            when (HiLoEngine.compare(prev, candidate)) {
+                CompareResult.HIGHER, CompareResult.LOWER -> return candidate
+                CompareResult.TIE -> { }
+            }
+        }
+
+        repeat(5000) {
+            val candidate = HiLoEngine.drawFiveCards().random()
+            if (candidate.rank == prev.rank) return@repeat
+
+            when (HiLoEngine.compare(prev, candidate)) {
+                CompareResult.HIGHER, CompareResult.LOWER -> return candidate
+                CompareResult.TIE -> { }
+            }
+        }
+
+        return HiLoEngine.drawFiveCards().first()
+    }
+
+    private fun drawCardRelativeToWithoutEqualRank(
+        prev: Card,
+        wantHigher: Boolean,
+        exclude: Set<Card>
+    ): Card {
+        repeat(5000) {
+            val candidate = HiLoEngine.drawFiveCards().random()
+
+            if (candidate in exclude) return@repeat
+            if (candidate.rank == prev.rank) return@repeat
+
+            when (HiLoEngine.compare(prev, candidate)) {
+                CompareResult.HIGHER -> if (wantHigher) return candidate
+                CompareResult.LOWER -> if (!wantHigher) return candidate
+                CompareResult.TIE -> { }
+            }
+        }
+
+        repeat(5000) {
+            val candidate = HiLoEngine.drawFiveCards().random()
+            if (candidate.rank == prev.rank) return@repeat
+
+            when (HiLoEngine.compare(prev, candidate)) {
+                CompareResult.HIGHER -> if (wantHigher) return candidate
+                CompareResult.LOWER -> if (!wantHigher) return candidate
+                CompareResult.TIE -> { }
+            }
+        }
+
+        return HiLoEngine.drawFiveCards().first()
     }
 }
