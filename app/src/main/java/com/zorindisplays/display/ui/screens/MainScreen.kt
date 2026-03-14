@@ -793,13 +793,17 @@ fun MainScreen(
                         }
                     }
 
-                    AnimatedAmountText(
-                        targetAmount = overlayAmount,
-                        format = ::formatAmount,
-                        fontSize = 72.sp,
-                        strokeWidth = 20f,
-                        animateOnFirst = false
-                    )
+                    if (state is UiState.Won) {
+                        WinAnimatedAmountOverlay(amount = overlayAmount)
+                    } else {
+                        AnimatedAmountText(
+                            targetAmount = overlayAmount,
+                            format = ::formatAmount,
+                            fontSize = 72.sp,
+                            strokeWidth = 20f,
+                            animateOnFirst = false
+                        )
+                    }
                 }
             }
         }
@@ -944,4 +948,32 @@ private fun formatAmount(value: Long): String {
         groupingSeparator = ' '
     }
     return DecimalFormat("#,###", symbols).format(value)
+}
+
+@Composable
+private fun WinAnimatedAmountOverlay(
+    amount: Long,
+    modifier: Modifier = Modifier
+) {
+    val animated = remember { Animatable(0f) }
+
+    LaunchedEffect(amount) {
+        animated.snapTo(0f)
+        animated.animateTo(
+            targetValue = amount.toFloat(),
+            animationSpec = tween(
+                durationMillis = 900,
+                easing = FastOutSlowInEasing
+            )
+        )
+    }
+
+    val shownAmount = animated.value.toLong().coerceAtMost(amount)
+
+    GoldShineText(
+        text = formatAmount(shownAmount),
+        fontSize = 72.sp,
+        strokeWidth = 20f,
+        modifier = modifier
+    )
 }

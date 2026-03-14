@@ -202,14 +202,16 @@ class GameViewModel : ViewModel() {
         _state.update { st ->
             when (st) {
                 UiState.Idle -> UiState.AmountEntry(raw = d.toString())
+
                 is UiState.AmountEntry -> {
                     val newRaw = (st.raw + d.toString()).trimStart('0')
                     UiState.AmountEntry(raw = if (newRaw.isEmpty()) "0" else newRaw)
                 }
+
                 is UiState.Ready,
                 is UiState.Playing,
                 is UiState.Lost,
-                is UiState.Won -> UiState.AmountEntry(raw = d.toString())
+                is UiState.Won -> st
             }
         }
     }
