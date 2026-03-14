@@ -25,6 +25,8 @@ class GameSoundManager(context: Context) {
     private val flipSoundId = soundPool.load(appContext, R.raw.flick, 1)
     private val registerSoundId = soundPool.load(appContext, R.raw.register, 1)
     private var kalimbaPlayer: MediaPlayer? = null
+    @Volatile
+    private var kalimbaRunning = false
 
     fun playRegister() {
         soundPool.play(registerSoundId, 1f, 1f, 1, 0, 1f)
@@ -43,6 +45,7 @@ class GameSoundManager(context: Context) {
     }
 
     fun release() {
+        kalimbaRunning = false
         kalimbaPlayer?.release()
         kalimbaPlayer = null
         soundPool.release()
@@ -57,46 +60,57 @@ class GameSoundManager(context: Context) {
             start()
         }
 
-        // Fade-in
+        kalimbaRunning = true
+
         Thread {
             val steps = 20
             val maxVolume = 0.6f
 
+            // fade-in
             for (i in 1..steps) {
+                if (!kalimbaRunning) return@Thread
+
                 val v = maxVolume * (i.toFloat() / steps.toFloat())
                 kalimbaPlayer?.setVolume(v, v)
                 Thread.sleep(50)
             }
 
-            startStereoDrift(maxVolume)
-
+            startEvolvingStereoDrift(baseVolume = maxVolume)
         }.start()
     }
 
     fun stopKalimbaLoop() {
+        kalimbaRunning = false
         kalimbaPlayer?.release()
         kalimbaPlayer = null
     }
 
-    private fun startStereoDrift(baseVolume: Float) {
-
+    private fun startEvolvingStereoDrift(baseVolume: Float) {
         Thread {
-
             var phase = 0.0
+            var t = 0
 
-            while (kalimbaPlayer != null) {
+            while (kalimbaRunning && kalimbaPlayer != null) {
+                // drift со временем становится чуть шире
+                val driftAmount = (0.10f + (t / 2000f)).coerceAtMost(0.22f)
 
-                val drift = (Math.sin(phase) * 0.15f).toFloat()
+                // и очень медленно "дышит" общая громкость
+                val volumePulse = (Math.sin(t * 0.015) * 0.05f).toFloat()
 
-                val left = (baseVolume + drift).coerceIn(0f, 1f)
-                val right = (baseVolume - drift).coerceIn(0f, 1f)
+                val drift = (Math.sin(phase) * driftAmount).toFloat()
+
+                val left = (baseVolume + volumePulse + drift).coerceIn(0f, 1f)
+                val right = (baseVolume + volumePulse - drift).coerceIn(0f, 1f)
 
                 kalimbaPlayer?.setVolume(left, right)
 
-                phase += 0.08
+                // drift постепенно чуть ускоряется
+                val phaseStep = (0.045 + (t / 20000.0)).coerceAtMost(0.085)
+                phase += phaseStep
+
+                t += 1
                 Thread.sleep(60)
             }
-
         }.start()
     }
 }
