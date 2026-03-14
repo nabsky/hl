@@ -102,7 +102,7 @@ fun MainScreen(
     var tempDeckMode by remember(showDeckModeDialog, deckMode) { mutableStateOf(deckMode) }
     var tempRtpInput by remember(showDeckModeDialog, fixedRtpInput) { mutableStateOf(fixedRtpInput) }
 
-    val showTopTokens = state is UiState.AmountEntry || state is UiState.Ready
+    val showTopTokens = state is UiState.AmountEntry || state is UiState.Ready || state is UiState.Playing || state is UiState.Won
 
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
