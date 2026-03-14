@@ -333,6 +333,7 @@ fun MainScreen(
         if (isWon) {
             var showTrophy by remember { mutableStateOf(false) }
             var starsActive by remember { mutableStateOf(false) }
+            val screenShake = remember { Animatable(0f) }
 
             LaunchedEffect(isWon) {
                 showTrophy = false
@@ -403,6 +404,30 @@ fun MainScreen(
                             )
                         )
 
+                        launch {
+                            screenShake.snapTo(18f)
+
+                            screenShake.animateTo(
+                                targetValue = -12f,
+                                animationSpec = tween(70)
+                            )
+
+                            screenShake.animateTo(
+                                targetValue = 8f,
+                                animationSpec = tween(70)
+                            )
+
+                            screenShake.animateTo(
+                                targetValue = -4f,
+                                animationSpec = tween(70)
+                            )
+
+                            screenShake.animateTo(
+                                targetValue = 0f,
+                                animationSpec = tween(60)
+                            )
+                        }
+
                         starsActive = true
                     }
                 }
@@ -410,6 +435,9 @@ fun MainScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .graphicsLayer {
+                            translationX = screenShake.value
+                        }
                         .zIndex(1000f),
                     contentAlignment = Alignment.Center
                 ) {

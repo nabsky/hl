@@ -104,4 +104,17 @@ fun App(
             vm.onRegisterSoundPlayed()
         }
     }
+
+    if (state is UiState.Won) {
+        LaunchedEffect("kalimba_start") {
+            kotlinx.coroutines.delay(3000)
+            soundManager.startKalimbaLoop()
+        }
+    }
+
+    if (state !is UiState.Won) {
+        LaunchedEffect("kalimba_stop") {
+            soundManager.stopKalimbaLoop()
+        }
+    }
 }
