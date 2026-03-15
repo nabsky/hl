@@ -122,6 +122,42 @@ fun MainScreen(
     var guessBubbleCardIndex by remember { mutableStateOf<Int?>(null) }
     var guessSubmitPending by remember { mutableStateOf(false) }
 
+    var startLoseAmountDrop by remember { mutableStateOf(false) }
+    var showLoseText by remember { mutableStateOf(false) }
+    var showLoseDim by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state) {
+        when (state) {
+            is UiState.Lost -> {
+                startLoseAmountDrop = false
+                showLoseText = false
+                showLoseDim = false
+
+                // карта уже перевернулась, красная заливка успела появиться
+                delay(1350)
+
+                // теперь падает сумма
+                startLoseAmountDrop = true
+
+                // ждём завершения падения суммы
+                delay(120)
+
+                // теперь затемняется экран
+                showLoseDim = true
+
+                // потом появляется текст
+                delay(120)
+                showLoseText = true
+            }
+
+            else -> {
+                startLoseAmountDrop = false
+                showLoseText = false
+                showLoseDim = false
+            }
+        }
+    }
+
 
     var showUpdateDialog by remember { mutableStateOf(false) }
     val downloadManagerUpdater = remember { ApkDownloadManagerUpdater(context) }
@@ -351,6 +387,22 @@ fun MainScreen(
                     guessBubbleCardIndex = guessBubbleCardIndex
                 )
             }
+        }
+
+        val loseDimAlpha by animateFloatAsState(
+            targetValue = if (showLoseDim) 0.35f else 0f,
+            animationSpec = tween(350),
+            label = "loseDimAlpha"
+        )
+
+        if (loseDimAlpha > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = loseDimAlpha }
+                    .background(Color.Black)
+                    .zIndex(1500f)
+            )
         }
 
         val playing = state as? UiState.Playing
@@ -626,7 +678,7 @@ fun MainScreen(
         val bottomOverlayText = when (val st = state) {
             is UiState.Ready -> "PRESS START TO BEGIN"
             is UiState.Playing -> if (st.awaitingGuess) "HIGHER OR LOWER" else ""
-            is UiState.Lost -> "BETTER LUCK NEXT TIME!"
+            is UiState.Lost -> if (showLoseText) "BETTER LUCK NEXT TIME!" else ""
             is UiState.Won -> "YOU WON!"
             else -> ""
         }
@@ -649,13 +701,19 @@ fun MainScreen(
                             strokeWidth = 20f
                         )
                     } else {
-                        BasicText(
-                            text = bottomOverlayText,
-                            style = DefaultTextStyle.copy(
-                                fontSize = 36.sp,
-                                textAlign = TextAlign.Center
+                        AnimatedVisibility(
+                            visible = bottomOverlayText.isNotEmpty(),
+                            enter = fadeIn(animationSpec = tween(800)),
+                            exit = fadeOut(animationSpec = tween(180))
+                        ) {
+                            BasicText(
+                                text = bottomOverlayText,
+                                style = DefaultTextStyle.copy(
+                                    fontSize = 36.sp,
+                                    textAlign = TextAlign.Center
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }
@@ -946,8 +1004,8 @@ fun MainScreen(
             val amountOffsetY = remember { Animatable(0f) }
             val amountAlpha = remember { Animatable(1f) }
 
-            LaunchedEffect(state) {
-                if (isLost) {
+            LaunchedEffect(state, startLoseAmountDrop) {
+                if (isLost && startLoseAmountDrop) {
                     amountOffsetY.snapTo(0f)
                     amountAlpha.snapTo(1f)
 
@@ -968,7 +1026,7 @@ fun MainScreen(
                             )
                         }
                     }
-                } else {
+                } else if (!isLost) {
                     amountOffsetY.snapTo(0f)
                     amountAlpha.snapTo(1f)
                 }
@@ -1135,7 +1193,7 @@ private fun RoundView(
 
             val isHigher = guessBubble == Guess.HIGHER
 
-            val bubbleX = cardCenterX + if (isHigher) 110.dp else (-110).dp
+            val bubbleX = cardCenterX + if (isHigher) 111.dp else (-111).dp
             val bubbleY = if (isHigher) (-140).dp else 140.dp
 
             val scale by animateFloatAsState(
