@@ -1135,8 +1135,8 @@ private fun RoundView(
 
             val isHigher = guessBubble == Guess.HIGHER
 
-            val bubbleX = cardCenterX + if (isHigher) 100.dp else (-100).dp
-            val bubbleY = if (isHigher) (-120).dp else 120.dp
+            val bubbleX = cardCenterX + if (isHigher) 110.dp else (-110).dp
+            val bubbleY = if (isHigher) (-140).dp else 140.dp
 
             val scale by animateFloatAsState(
                 targetValue = 1f,
