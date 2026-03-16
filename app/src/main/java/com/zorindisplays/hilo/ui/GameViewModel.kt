@@ -56,6 +56,8 @@ private const val KEY_FIXED_SHOULD_WIN = "fixed_should_win"
 private const val KEY_FIXED_SHOULD_WIN_PRESENT = "fixed_should_win_present"
 private const val KEY_FIXED_LOSE_STEP = "fixed_lose_step"
 
+private const val KEY_EMULATOR_INITIAL_AMOUNT = "emulator_initial_amount"
+
 class GameViewModel : ViewModel() {
 
     private val _state = MutableStateFlow<UiState>(UiState.Idle)
@@ -91,6 +93,8 @@ class GameViewModel : ViewModel() {
         val modeName = prefs.getString(KEY_DECK_MODE, DeckMode.RANDOM_DECK.name)
         val rtp = prefs.getString(KEY_FIXED_RTP, "98.00") ?: "98.00"
 
+        val emulatorInitialAmount = prefs.getString(KEY_EMULATOR_INITIAL_AMOUNT, "100000") ?: "100000"
+
         _deckMode.value = try {
             DeckMode.valueOf(modeName ?: DeckMode.RANDOM_DECK.name)
         } catch (_: Exception) {
@@ -98,6 +102,8 @@ class GameViewModel : ViewModel() {
         }
 
         _fixedRtpInput.value = formatRtp(rtp)
+
+        _emulatorInitialAmount.value = emulatorInitialAmount
 
         _stats.value = GameStats(
             gamesCount = prefs.getLong(KEY_GAMES_COUNT, 0L),
@@ -109,6 +115,9 @@ class GameViewModel : ViewModel() {
         settingsLoaded = true
     }
 
+    private val _emulatorInitialAmount = MutableStateFlow("100000")
+    val emulatorInitialAmount: StateFlow<String> = _emulatorInitialAmount
+
     private fun saveSettings(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit()
@@ -118,7 +127,19 @@ class GameViewModel : ViewModel() {
             .putLong(KEY_WINS_COUNT, _stats.value.winsCount)
             .putLong(KEY_TOTAL_IN, _stats.value.totalIn)
             .putLong(KEY_TOTAL_OUT, _stats.value.totalOut)
+            .putString(KEY_EMULATOR_INITIAL_AMOUNT, _emulatorInitialAmount.value)
             .apply()
+    }
+
+    fun setEmulatorInitialAmount(value: String, context: Context? = null) {
+        if (context != null) appContext = context.applicationContext
+
+        val sanitized = value.filter { it.isDigit() }
+            .take(9)
+            .ifBlank { "100000" }
+
+        _emulatorInitialAmount.value = sanitized
+        saveSettingsIfPossible()
     }
 
     private fun saveSettingsIfPossible() {
@@ -255,6 +276,40 @@ class GameViewModel : ViewModel() {
                     if (newRaw.isBlank()) UiState.Idle else UiState.AmountEntry(newRaw)
                 }
                 else -> st
+            }
+        }
+        saveGameStateIfPossible()
+    }
+
+    fun resetToIdle() {
+        confettiJob?.cancel()
+        _state.value = UiState.Idle
+        resetFixedRoundState()
+        saveGameStateIfPossible()
+    }
+
+    fun startRoundWithAmount(amount: Long) {
+        if (inputLocked) return
+        if (amount <= 0L) {
+            resetToIdle()
+            return
+        }
+
+        _state.value = when (_deckMode.value) {
+            DeckMode.RANDOM_DECK -> {
+                resetFixedRoundState()
+                UiState.Ready(
+                    amount = amount,
+                    cards = HiLoEngine.drawFiveCards()
+                )
+            }
+
+            DeckMode.FIXED_RTP -> {
+                prepareFixedRtpRound()
+                UiState.Ready(
+                    amount = amount,
+                    cards = buildFixedRtpInitialCards()
+                )
             }
         }
         saveGameStateIfPossible()

@@ -71,6 +71,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import com.zorindisplays.hilo.util.ApkDownloadManagerUpdater
 import com.zorindisplays.hilo.audio.GameSoundManager
+import com.zorindisplays.hilo.emulator.Emulator
 import com.zorindisplays.hilo.ui.WinKonfettiOverlay
 import com.zorindisplays.hilo.ui.components.TableBackground
 import com.zorindisplays.hilo.ui.theme.JackpotTopAmountPadding
@@ -170,6 +171,15 @@ fun MainScreen(
     var updateInProgress by remember { mutableStateOf(false) }
     val tokensPainter = painterResource(R.drawable.tokens)
 
+    val emulator = remember { Emulator() }
+    var showEmulatorDialog by remember { mutableStateOf(false) }
+    var emulatorBaseAmount by remember { mutableStateOf<Long?>(null) }
+    var emulatorRunning by remember { mutableStateOf(false) }
+    val emulatorInitialAmount by vm.emulatorInitialAmount.collectAsState()
+    var emulatorAmountInput by remember(showEmulatorDialog, emulatorInitialAmount) {
+        mutableStateOf(emulatorInitialAmount)
+    }
+
     val isFixedRtpMode = deckMode == DeckMode.FIXED_RTP
 
     val trophyGlowMain = if (isFixedRtpMode) {
@@ -191,7 +201,6 @@ fun MainScreen(
             "unknown"
         }
     }
-
 
     fun submitGuessWithBubble(guess: Guess) {
         val playing = state as? UiState.Playing ?: return
@@ -219,6 +228,41 @@ fun MainScreen(
         }
     }
 
+
+    fun stopEmulator() {
+        emulatorRunning = false
+    }
+
+    fun handleManualKey(key: Key): Boolean {
+        return when (key) {
+            Key.Enter -> { vm.onEnter(); true }
+            Key.Backspace -> { vm.onBackspace(); true }
+            Key.S -> { vm.onStart(); true }
+            Key.H -> { submitGuessWithBubble(Guess.HIGHER); true }
+            Key.L -> { submitGuessWithBubble(Guess.LOWER); true }
+            Key.R -> { showDeckModeDialog = true; true }
+            Key.U -> { showUpdateDialog = true; true }
+            Key.E -> {
+                emulatorAmountInput = (emulatorBaseAmount ?: overlayAmount ?: 100L).toString()
+                showEmulatorDialog = true
+                true
+            }
+
+            Key.Zero, Key.NumPad0 -> { vm.onDigit(0); true }
+            Key.One, Key.NumPad1 -> { vm.onDigit(1); true }
+            Key.Two, Key.NumPad2 -> { vm.onDigit(2); true }
+            Key.Three, Key.NumPad3 -> { vm.onDigit(3); true }
+            Key.Four, Key.NumPad4 -> { vm.onDigit(4); true }
+            Key.Five, Key.NumPad5 -> { vm.onDigit(5); true }
+            Key.Six, Key.NumPad6 -> { vm.onDigit(6); true }
+            Key.Seven, Key.NumPad7 -> { vm.onDigit(7); true }
+            Key.Eight, Key.NumPad8 -> { vm.onDigit(8); true }
+            Key.Nine, Key.NumPad9 -> { vm.onDigit(9); true }
+
+            else -> false
+        }
+    }
+
     LaunchedEffect(state) {
         when (state) {
             UiState.Idle,
@@ -236,6 +280,50 @@ fun MainScreen(
         vm.loadSettings(context)
     }
 
+    LaunchedEffect(emulatorRunning, state, guessSubmitPending) {
+        if (!emulatorRunning) return@LaunchedEffect
+
+        when (val st = state) {
+            UiState.Idle -> {
+                val amount = emulatorBaseAmount ?: return@LaunchedEffect
+                delay(120)
+                vm.startRoundWithAmount(amount)
+            }
+
+            is UiState.AmountEntry -> {
+                val amount = emulatorBaseAmount ?: return@LaunchedEffect
+                delay(120)
+                vm.startRoundWithAmount(amount)
+            }
+
+            is UiState.Ready -> {
+                delay(280)
+                vm.onStart()
+            }
+
+            is UiState.Playing -> {
+                if (!st.awaitingGuess || guessSubmitPending) return@LaunchedEffect
+
+                val currentCard = st.cards.getOrNull(st.revealedCount - 1) ?: return@LaunchedEffect
+                val visibleCards = st.cards.take(st.revealedCount)
+
+                delay(260)
+                submitGuessWithBubble(
+                    emulator.chooseOptimalGuess(
+                        currentCard = currentCard,
+                        revealedCards = visibleCards
+                    )
+                )
+            }
+
+            is UiState.Lost,
+            is UiState.Won -> {
+                delay(1700)
+                vm.resetToIdle()
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -244,28 +332,11 @@ fun MainScreen(
             .onKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
 
-                when (e.key) {
-                    Key.Enter -> { vm.onEnter(); true }
-                    Key.Backspace -> { vm.onBackspace(); true }
-                    Key.S -> { vm.onStart(); true }
-                    Key.H -> { submitGuessWithBubble(Guess.HIGHER); true }
-                    Key.L -> { submitGuessWithBubble(Guess.LOWER); true }
-                    Key.R -> { showDeckModeDialog = true; true }
-                    Key.U -> { showUpdateDialog = true; true }
-
-                    Key.Zero, Key.NumPad0 -> { vm.onDigit(0); true }
-                    Key.One, Key.NumPad1 -> { vm.onDigit(1); true }
-                    Key.Two, Key.NumPad2 -> { vm.onDigit(2); true }
-                    Key.Three, Key.NumPad3 -> { vm.onDigit(3); true }
-                    Key.Four, Key.NumPad4 -> { vm.onDigit(4); true }
-                    Key.Five, Key.NumPad5 -> { vm.onDigit(5); true }
-                    Key.Six, Key.NumPad6 -> { vm.onDigit(6); true }
-                    Key.Seven, Key.NumPad7 -> { vm.onDigit(7); true }
-                    Key.Eight, Key.NumPad8 -> { vm.onDigit(8); true }
-                    Key.Nine, Key.NumPad9 -> { vm.onDigit(9); true }
-
-                    else -> false
+                if (emulatorRunning) {
+                    stopEmulator()
                 }
+
+                handleManualKey(e.key)
             }
     ) {
         TableBackground(isFixedRtp = deckMode == DeckMode.FIXED_RTP)
@@ -281,6 +352,18 @@ fun MainScreen(
                 .zIndex(5000f)
         )
 
+        if (emulatorRunning) {
+            Text(
+                text = "DEMO MODE",
+                fontSize = 18.sp,
+                letterSpacing = 1.sp,
+                color = Color(0xFFFFD54A),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 18.dp)
+                    .zIndex(5000f)
+            )
+        }
 
         AnimatedVisibility(
             visible = showTopTokens,
@@ -827,6 +910,60 @@ fun MainScreen(
                 dismissButton = {
                     TextButton(
                         onClick = { showDeckModeDialog = false }
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        if (showEmulatorDialog) {
+            AlertDialog(
+                onDismissRequest = { showEmulatorDialog = false },
+                title = {
+                    Text("Demo emulator")
+                },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text("Press any key to stop the emulator and continue manually.")
+
+                        OutlinedTextField(
+                            value = emulatorAmountInput,
+                            onValueChange = {
+                                emulatorAmountInput = it.filter { ch -> ch.isDigit() }.take(9)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Initial amount") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Number
+                            )
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val finalAmount = emulatorAmountInput.filter { it.isDigit() }.ifBlank { "100000" }
+                            vm.setEmulatorInitialAmount(finalAmount, context)
+                            val amount = finalAmount.toLongOrNull()
+                            if (amount != null && amount > 0L) {
+                                emulatorBaseAmount = amount
+                                vm.resetToIdle()
+                                emulatorRunning = true
+                                showEmulatorDialog = false
+                            }
+                        }
+                    ) {
+                        Text("OK")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showEmulatorDialog = false }
                     ) {
                         Text("Cancel")
                     }
