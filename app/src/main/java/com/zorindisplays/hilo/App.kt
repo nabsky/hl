@@ -18,8 +18,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.zIndex
+import coil3.request.ImageRequest
 import com.zorindisplays.hilo.audio.GameSoundManager
+import com.zorindisplays.hilo.model.Rank
+import com.zorindisplays.hilo.model.Suit
 import com.zorindisplays.hilo.model.UiState
+import com.zorindisplays.hilo.model.cardBackAssetUrl
 import com.zorindisplays.hilo.ui.GameViewModel
 import com.zorindisplays.hilo.ui.buildSvgImageLoader
 import com.zorindisplays.hilo.ui.screens.MainScreen
@@ -38,6 +42,29 @@ fun App(
         onDispose {
             soundManager.release()
         }
+    }
+
+    LaunchedEffect(Unit) {
+        val ranks = Rank.entries
+        val suits = Suit.entries
+        for (r in ranks) {
+            for (s in suits) {
+                val url = "file:///android_asset/cards/card_${r.fileCode}${s.code}.svg"
+                imageLoader.enqueue(
+                    ImageRequest.Builder(context)
+                        .data(url)
+                        .size(360, 520)
+                        .build()
+                )
+            }
+        }
+        // рубашка
+        imageLoader.enqueue(
+            ImageRequest.Builder(context)
+                .data(cardBackAssetUrl())
+                .size(360, 520)
+                .build()
+        )
     }
 
     val fgRes = when (state) {

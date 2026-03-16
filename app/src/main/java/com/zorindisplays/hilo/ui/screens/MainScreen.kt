@@ -67,7 +67,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import coil3.compose.rememberAsyncImagePainter
+import coil3.request.ImageRequest
 import com.zorindisplays.hilo.util.ApkDownloadManagerUpdater
 import com.zorindisplays.hilo.audio.GameSoundManager
 import com.zorindisplays.hilo.emulator.Emulator
@@ -157,7 +160,6 @@ fun MainScreen(
             }
         }
     }
-
 
     var showUpdateDialog by remember { mutableStateOf(false) }
     val downloadManagerUpdater = remember { ApkDownloadManagerUpdater(context) }
@@ -1360,6 +1362,7 @@ private fun FlipCard(
         )
     }
 
+
     val url = if (shownFaceUp && card != null) card.assetUrl() else cardBackAssetUrl()
 
     val isAnimating = abs(rotation.value) > 0.5f
@@ -1373,11 +1376,19 @@ private fun FlipCard(
                 clip = !isAnimating
             }
     ) {
-        AsyncImage(
-            model = url,
-            imageLoader = imageLoader,
+        val painter = rememberAsyncImagePainter(
+            model = ImageRequest.Builder(context)
+                .data(url)
+                .size(360, 520)   // примерно 2x от размера карты
+                .build(),
+            imageLoader = imageLoader
+        )
+
+        Image(
+            painter = painter,
             contentDescription = null,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.FillBounds
         )
     }
 }
