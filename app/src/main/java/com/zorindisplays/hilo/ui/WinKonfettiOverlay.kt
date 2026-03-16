@@ -28,14 +28,14 @@ fun WinKonfettiOverlay(modifier: Modifier = Modifier) {
 
     val leftParty = remember {
         Party(
-            position = Position.Relative(-0.12, -0.24),
+            position = Position.Relative(-0.06, -0.12),
             angle = 65,
-            spread = 36,
-            speed = 14f,
-            maxSpeed = 22f,
-            damping = 0.96f,
-            timeToLive = 2200L,
-            size = listOf(Size(96), Size(128)),
+            spread = 28,
+            speed = 10f,
+            maxSpeed = 16f,
+            damping = 0.97f,
+            timeToLive = 1600L,
+            size = listOf(Size(72), Size(88)),
             shapes = listOf(coinShape),
             colors = listOf(
                 0xFFFFD700.toInt(),
@@ -43,22 +43,22 @@ fun WinKonfettiOverlay(modifier: Modifier = Modifier) {
                 0xFFFFE082.toInt()
             ),
             emitter = Emitter(
-                duration = 700,
+                duration = 420,
                 TimeUnit.MILLISECONDS
-            ).perSecond(140)
+            ).perSecond(70)
         )
     }
 
     val rightParty = remember {
         Party(
-            position = Position.Relative(1.12, -0.24),
+            position = Position.Relative(1.06, -0.12),
             angle = 115,
-            spread = 36,
-            speed = 14f,
-            maxSpeed = 22f,
-            damping = 0.96f,
-            timeToLive = 2200L,
-            size = listOf(Size(96), Size(128)),
+            spread = 28,
+            speed = 10f,
+            maxSpeed = 16f,
+            damping = 0.97f,
+            timeToLive = 1600L,
+            size = listOf(Size(72), Size(88)),
             shapes = listOf(coinShape),
             colors = listOf(
                 0xFFFFD700.toInt(),
@@ -66,22 +66,22 @@ fun WinKonfettiOverlay(modifier: Modifier = Modifier) {
                 0xFFFFE082.toInt()
             ),
             emitter = Emitter(
-                duration = 700,
+                duration = 420,
                 TimeUnit.MILLISECONDS
-            ).perSecond(140)
+            ).perSecond(70)
         )
     }
 
     val topCenterParty = remember {
         Party(
-            position = Position.Relative(0.5, -0.24),
+            position = Position.Relative(0.5, -0.10),
             angle = Angle.BOTTOM,
-            spread = 70,
-            speed = 10f,
-            maxSpeed = 18f,
-            damping = 0.97f,
-            timeToLive = 2400L,
-            size = listOf(Size(72), Size(96)),
+            spread = 50,
+            speed = 8f,
+            maxSpeed = 14f,
+            damping = 0.975f,
+            timeToLive = 1700L,
+            size = listOf(Size(64), Size(80)),
             shapes = listOf(coinShape),
             colors = listOf(
                 0xFFFFD700.toInt(),
@@ -89,9 +89,9 @@ fun WinKonfettiOverlay(modifier: Modifier = Modifier) {
                 0xFFFFE082.toInt()
             ),
             emitter = Emitter(
-                duration = 900,
+                duration = 520,
                 TimeUnit.MILLISECONDS
-            ).perSecond(110)
+            ).perSecond(55)
         )
     }
 

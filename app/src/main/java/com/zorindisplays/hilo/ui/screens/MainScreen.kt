@@ -65,7 +65,6 @@ import java.util.Locale
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -507,7 +506,6 @@ fun MainScreen(
         if (isWon) {
             var showTrophy by remember { mutableStateOf(false) }
             var starsActive by remember { mutableStateOf(false) }
-            val screenShake = remember { Animatable(0f) }
 
             LaunchedEffect(isWon) {
                 showTrophy = false
@@ -578,30 +576,6 @@ fun MainScreen(
                             )
                         )
 
-                        launch {
-                            screenShake.snapTo(18f)
-
-                            screenShake.animateTo(
-                                targetValue = -12f,
-                                animationSpec = tween(70)
-                            )
-
-                            screenShake.animateTo(
-                                targetValue = 8f,
-                                animationSpec = tween(70)
-                            )
-
-                            screenShake.animateTo(
-                                targetValue = -4f,
-                                animationSpec = tween(70)
-                            )
-
-                            screenShake.animateTo(
-                                targetValue = 0f,
-                                animationSpec = tween(60)
-                            )
-                        }
-
                         starsActive = true
                     }
                 }
@@ -609,9 +583,6 @@ fun MainScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .graphicsLayer {
-                            translationX = screenShake.value
-                        }
                         .zIndex(1000f),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1290,14 +1261,11 @@ private fun RoundView(
                         .width(180.dp)
                         .height(260.dp)
                 ) {
-                    val cardShape = RoundedCornerShape(10.dp)
-
                     Box(
                         modifier = Modifier
                             .matchParentSize()
                             // подгони под реальный размер картинки
                             .padding(horizontal = 2.dp, vertical = 7.dp)
-                            .clip(cardShape)
                     ) {
                         FlipCard(
                             imageLoader = imageLoader,
@@ -1398,20 +1366,11 @@ private fun FlipCard(
 
     Box(
         modifier = modifier
-            .then(
-                if (!isAnimating) {
-                    Modifier.shadow(
-                        elevation = 12.dp,
-                        shape = RoundedCornerShape(10.dp),
-                        clip = false
-                    )
-                } else {
-                    Modifier
-                }
-            )
             .graphicsLayer {
                 rotationY = rotation.value
                 cameraDistance = 24f * density
+                shape = RoundedCornerShape(10.dp)
+                clip = !isAnimating
             }
     ) {
         AsyncImage(

@@ -28,46 +28,36 @@ fun KonfettiOverlay(modifier: Modifier = Modifier) {
         )
     }
 
-    val party = remember {
-        Party(
-            // центр снизу
-            position = Position.Relative(0.5, 1.0),
+    val party = Party(
+        position = Position.Relative(0.5, 1.0),
 
-            // вверх, но широко
-            angle = Angle.TOP,
-            spread = 120,                 // БОЛЬШЕ в стороны
+        angle = Angle.TOP,
+        spread = 95,
 
-            // быстрее старт
-            speed = 48f,                 // было ~18
-            maxSpeed = 60f,              // резкий выстрел
+        speed = 42f,
+        maxSpeed = 56f,
 
-            // меньше торможения = быстрее падают
-            damping = 0.95f,             // было 0.92
+        damping = 0.95f,
 
-            // КРУПНЫЕ монеты
-            size = listOf(
-                Size(128)
-            ),
+        size = listOf(
+            Size(96)
+        ),
 
-            // форма монет
-            shapes = listOf(coinShape),
+        shapes = listOf(coinShape),
 
-            timeToLive = 400L,
+        timeToLive = 320L,
 
-            // золото
-            colors = listOf(
-                0xFFFFD700.toInt(),
-                0xFFFFC107.toInt(),
-                0xFFFFE082.toInt()
-            ),
+        colors = listOf(
+            0xFFFFD700.toInt(),
+            0xFFFFC107.toInt(),
+            0xFFFFE082.toInt()
+        ),
 
-            // короткий, плотный burst
-            emitter = Emitter(
-                duration = 180,          // быстрее, не затягиваем
-                TimeUnit.MILLISECONDS
-            ).perSecond(320)              // МНОГО частиц сразу
-        )
-    }
+        emitter = Emitter(
+            duration = 160,
+            TimeUnit.MILLISECONDS
+        ).perSecond(110)
+    )
 
     KonfettiView(
         modifier = modifier,
