@@ -66,10 +66,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import com.zorindisplays.hilo.util.ApkDownloadManagerUpdater
 import com.zorindisplays.hilo.audio.GameSoundManager
 import com.zorindisplays.hilo.emulator.Emulator
@@ -182,6 +185,34 @@ fun MainScreen(
     var updateStatus by remember { mutableStateOf("") }
     var updateProgress by remember { mutableStateOf(0) }
     var updateInProgress by remember { mutableStateOf(false) }
+
+    var tempRtpField by remember(showDeckModeDialog, fixedRtpInput) {
+        mutableStateOf(
+            TextFieldValue(
+                text = fixedRtpInput,
+                selection = TextRange(0, fixedRtpInput.length)
+            )
+        )
+    }
+
+    var emulatorAmountField by remember(showEmulatorDialog, emulatorAmountInput) {
+        mutableStateOf(
+            TextFieldValue(
+                text = emulatorAmountInput,
+                selection = TextRange(0, emulatorAmountInput.length)
+            )
+        )
+    }
+
+    var updateCodeField by remember(showUpdateDialog, updateCode) {
+        mutableStateOf(
+            TextFieldValue(
+                text = updateCode,
+                selection = TextRange(0, updateCode.length)
+            )
+        )
+    }
+
     val tokensPainter = painterResource(R.drawable.tokens)
 
     val isFixedRtpMode = deckMode == DeckMode.FIXED_RTP
@@ -528,8 +559,95 @@ fun MainScreen(
         }
 
         val context = LocalContext.current
+
+        fun confirmDeckModeDialog() {
+            tempRtpInput = tempRtpField.text
+            vm.setDeckMode(tempDeckMode, context)
+            vm.commitFixedRtp(tempRtpInput, context)
+            showDeckModeDialog = false
+        }
+
+        fun confirmEmulatorDialog() {
+            val finalAmount = emulatorAmountField.text
+                .filter { it.isDigit() }
+                .ifBlank { "100000" }
+
+            emulatorAmountInput = finalAmount
+            emulatorAmountField = TextFieldValue(
+                text = finalAmount,
+                selection = TextRange(0, finalAmount.length)
+            )
+
+            vm.setEmulatorInitialAmount(finalAmount, context)
+
+            val amount = finalAmount.toLongOrNull()
+            if (amount != null && amount > 0L) {
+                emulatorBaseAmount = amount
+                vm.resetToIdle()
+                emulatorRunning = true
+                showEmulatorDialog = false
+            }
+        }
+
+        fun confirmUpdateDialog() {
+            if (updateInProgress) return
+
+            val code = updateCodeField.text.trim()
+            if (code.isEmpty()) {
+                updateStatus = "Enter code"
+                return
+            }
+
+            try {
+                updateInProgress = true
+                updateProgress = 0
+                updateStatus = "Preparing update..."
+
+                val url = "https://nabsky.bitbucket.io/baccarat/$code.apk"
+
+                val onProgress: (Int) -> Unit = { percent ->
+                    updateProgress = percent
+                }
+
+                val onError: (String) -> Unit = { error ->
+                    updateInProgress = false
+                    updateStatus = error
+                }
+
+                when (updateMethod) {
+                    UpdateMethod.DOWNLOAD_MANAGER -> {
+                        downloadManagerUpdater.downloadAndInstall(
+                            url = url,
+                            fileName = "update.apk",
+                            onProgress = onProgress,
+                            onError = onError
+                        )
+                    }
+
+                    UpdateMethod.OKHTTP -> {
+                        okHttpUpdater.downloadAndInstall(
+                            url = url,
+                            fileName = "update.apk",
+                            onProgress = onProgress,
+                            onError = onError
+                        )
+                    }
+                }
+
+                showUpdateDialog = false
+                updateCode = ""
+                updateCodeField = TextFieldValue("")
+                updateStatus = ""
+                updateProgress = 0
+                updateInProgress = false
+            } catch (t: Throwable) {
+                updateStatus = t.message ?: "Update failed"
+                updateInProgress = false
+            }
+        }
+
         if (showDeckModeDialog) {
-            val rtpValue = tempRtpInput.replace(',', '.').toDoubleOrNull()?.coerceIn(0.0, 100.0) ?: 0.0
+            val rtpValue = tempRtpField.text.replace(',', '.').toDoubleOrNull()?.coerceIn(0.0, 100.0) ?: 0.0
             val winChancePercent = rtpValue / 16.0
             val oneIn = if (winChancePercent > 0.0) 100.0 / winChancePercent else null
 
@@ -545,90 +663,99 @@ fun MainScreen(
                     Text("Deck Mode")
                 },
                 text = {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    DialogKeyHandler(
+                        onConfirm = ::confirmDeckModeDialog,
+                        onDismiss = { showDeckModeDialog = false }
                     ) {
-                        Text(
-                            text = "Games: ${stats.gamesCount}    Wins: ${stats.winsCount}"
-                        )
-
-                        Text(
-                            text = "IN: ${formatAmount(stats.totalIn)}    OUT: ${formatAmount(stats.totalOut)}    RTP: ${"%.2f".format(currentFactRtp)}%"
-                        )
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { tempDeckMode = DeckMode.RANDOM_DECK },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = tempDeckMode == DeckMode.RANDOM_DECK,
-                                onClick = { tempDeckMode = DeckMode.RANDOM_DECK }
-                            )
-                            Text("Random Deck")
-                        }
-
-                        Row(
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            RadioButton(
-                                selected = tempDeckMode == DeckMode.FIXED_RTP,
-                                onClick = { tempDeckMode = DeckMode.FIXED_RTP }
-                            )
-
-                            OutlinedTextField(
-                                value = tempRtpInput,
-                                onValueChange = { newValue ->
-                                    val normalized = newValue.replace(',', '.')
-                                    if (normalized.count { it == '.' } <= 1) {
-                                        val filtered = buildString {
-                                            normalized.forEach { ch ->
-                                                if (ch.isDigit() || ch == '.') append(ch)
-                                            }
-                                        }
-
-                                        val parts = filtered.split('.')
-                                        tempRtpInput = when {
-                                            parts.size == 1 -> parts[0].take(6)
-                                            else -> {
-                                                val intPart = parts[0].take(6)
-                                                val fracPart = parts[1].take(2)
-                                                "$intPart.$fracPart"
-                                            }
-                                        }
-                                    }
-                                },
-                                modifier = Modifier.width(120.dp),
-                                singleLine = true,
-                                label = { Text("Fixed RTP") },
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Decimal
-                                )
+                            Text(
+                                text = "Games: ${stats.gamesCount}    Wins: ${stats.winsCount}"
                             )
 
                             Text(
-                                text = if (oneIn != null) {
-                                    "Win: ${"%.2f".format(winChancePercent)}% (~1 in ${"%.2f".format(oneIn)})"
-                                } else {
-                                    "Win: 0.00%"
-                                },
-                                modifier = Modifier.weight(1f)
+                                text = "IN: ${formatAmount(stats.totalIn)}    OUT: ${formatAmount(stats.totalOut)}    RTP: ${"%.2f".format(currentFactRtp)}%"
                             )
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { tempDeckMode = DeckMode.RANDOM_DECK },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = tempDeckMode == DeckMode.RANDOM_DECK,
+                                    onClick = { tempDeckMode = DeckMode.RANDOM_DECK }
+                                )
+                                Text("Random Deck")
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                RadioButton(
+                                    selected = tempDeckMode == DeckMode.FIXED_RTP,
+                                    onClick = { tempDeckMode = DeckMode.FIXED_RTP }
+                                )
+
+                                SelectAllOutlinedTextField(
+                                    value = tempRtpField,
+                                    onValueChange = { newValue ->
+                                        val normalized = newValue.text.replace(',', '.')
+                                        if (normalized.count { it == '.' } <= 1) {
+                                            val filtered = buildString {
+                                                normalized.forEach { ch ->
+                                                    if (ch.isDigit() || ch == '.') append(ch)
+                                                }
+                                            }
+
+                                            val parts = filtered.split('.')
+                                            val sanitized = when {
+                                                parts.size == 1 -> parts[0].take(6)
+                                                else -> {
+                                                    val intPart = parts[0].take(6)
+                                                    val fracPart = parts[1].take(2)
+                                                    "$intPart.$fracPart"
+                                                }
+                                            }
+
+                                            tempRtpInput = sanitized
+                                            tempRtpField = newValue.copy(
+                                                text = sanitized,
+                                                selection = TextRange(
+                                                    sanitized.length.coerceAtMost(newValue.selection.start),
+                                                    sanitized.length.coerceAtMost(newValue.selection.end)
+                                                )
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier.width(120.dp),
+                                    singleLine = true,
+                                    label = { Text("Fixed RTP") },
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Decimal
+                                    ),
+                                    autoFocus = true
+                                )
+
+                                Text(
+                                    text = if (oneIn != null) {
+                                        "Win: ${"%.2f".format(winChancePercent)}% (~1 in ${"%.2f".format(oneIn)})"
+                                    } else {
+                                        "Win: 0.00%"
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                         }
                     }
                 },
                 confirmButton = {
-                    Button(
-                        onClick = {
-                            vm.setDeckMode(tempDeckMode, context)
-                            vm.commitFixedRtp(tempRtpInput, context)
-                            showDeckModeDialog = false
-                        }
-                    ) {
+                    Button(onClick = ::confirmDeckModeDialog) {
                         Text("Save")
                     }
                 },
@@ -642,26 +769,12 @@ fun MainScreen(
             )
         }
 
-        fun confirmEmulatorDialog() {
-            val finalAmount = emulatorAmountInput
-                .filter { it.isDigit() }
-                .ifBlank { "100000" }
-
-            vm.setEmulatorInitialAmount(finalAmount, context)
-
-            val amount = finalAmount.toLongOrNull()
-            if (amount != null && amount > 0L) {
-                emulatorBaseAmount = amount
-                vm.resetToIdle()
-                emulatorRunning = true
-                showEmulatorDialog = false
-            }
-        }
-
         if (showEmulatorDialog) {
             AlertDialog(
                 onDismissRequest = { showEmulatorDialog = false },
-                title = { Text("Demo emulator") },
+                title = {
+                    Text("Demo emulator")
+                },
                 text = {
                     DialogKeyHandler(
                         onConfirm = ::confirmEmulatorDialog,
@@ -673,17 +786,26 @@ fun MainScreen(
                         ) {
                             Text("Press any key to stop the emulator and continue manually.")
 
-                            OutlinedTextField(
-                                value = emulatorAmountInput,
-                                onValueChange = {
-                                    emulatorAmountInput = it.filter { ch -> ch.isDigit() }.take(9)
+                            SelectAllOutlinedTextField(
+                                value = emulatorAmountField,
+                                onValueChange = { newValue ->
+                                    val sanitized = newValue.text.filter { ch -> ch.isDigit() }.take(9)
+                                    emulatorAmountInput = sanitized
+                                    emulatorAmountField = newValue.copy(
+                                        text = sanitized,
+                                        selection = TextRange(
+                                            sanitized.length.coerceAtMost(newValue.selection.start),
+                                            sanitized.length.coerceAtMost(newValue.selection.end)
+                                        )
+                                    )
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 label = { Text("Initial amount") },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Number
-                                )
+                                ),
+                                autoFocus = true
                             )
                         }
                     }
@@ -694,7 +816,9 @@ fun MainScreen(
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showEmulatorDialog = false }) {
+                    TextButton(
+                        onClick = { showEmulatorDialog = false }
+                    ) {
                         Text("Cancel")
                     }
                 }
@@ -714,66 +838,86 @@ fun MainScreen(
                     Text("Software Update")
                 },
                 text = {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text("Current version: $versionName")
-
-                        OutlinedTextField(
-                            value = updateCode,
-                            onValueChange = {
-                                updateCode = it.filter { ch -> ch.isDigit() }
+                    DialogKeyHandler(
+                        onConfirm = ::confirmUpdateDialog,
+                        onDismiss = {
+                            if (!updateInProgress) {
+                                showUpdateDialog = false
                                 updateStatus = ""
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Update code") },
-                            singleLine = true,
-                            enabled = !updateInProgress,
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Number
-                            )
-                        )
-
-                        if (updateInProgress) {
-                            Text("Downloading: $updateProgress%")
+                                updateProgress = 0
+                            }
                         }
-
-                        if (updateStatus.isNotEmpty()) {
-                            Text(updateStatus)
-                        }
-
-                        Row(
+                    ) {
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = updateMethod == UpdateMethod.DOWNLOAD_MANAGER,
-                                    onClick = {
-                                        if (!updateInProgress) {
-                                            updateMethod = UpdateMethod.DOWNLOAD_MANAGER
-                                        }
-                                    }
-                                )
-                                Text("Download Manager")
+                            Text("Current version: $versionName")
+
+                            SelectAllOutlinedTextField(
+                                value = updateCodeField,
+                                onValueChange = { newValue ->
+                                    val sanitized = newValue.text.filter { ch -> ch.isDigit() }
+                                    updateCode = sanitized
+                                    updateStatus = ""
+                                    updateCodeField = newValue.copy(
+                                        text = sanitized,
+                                        selection = TextRange(
+                                            sanitized.length.coerceAtMost(newValue.selection.start),
+                                            sanitized.length.coerceAtMost(newValue.selection.end)
+                                        )
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("Update code") },
+                                singleLine = true,
+                                enabled = !updateInProgress,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Number
+                                ),
+                                autoFocus = true
+                            )
+
+                            if (updateInProgress) {
+                                Text("Downloading: $updateProgress%")
+                            }
+
+                            if (updateStatus.isNotEmpty()) {
+                                Text(updateStatus)
                             }
 
                             Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                RadioButton(
-                                    selected = updateMethod == UpdateMethod.OKHTTP,
-                                    onClick = {
-                                        if (!updateInProgress) {
-                                            updateMethod = UpdateMethod.OKHTTP
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = updateMethod == UpdateMethod.DOWNLOAD_MANAGER,
+                                        onClick = {
+                                            if (!updateInProgress) {
+                                                updateMethod = UpdateMethod.DOWNLOAD_MANAGER
+                                            }
                                         }
-                                    }
-                                )
-                                Text("OkHTTP")
+                                    )
+                                    Text("Download Manager")
+                                }
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = updateMethod == UpdateMethod.OKHTTP,
+                                        onClick = {
+                                            if (!updateInProgress) {
+                                                updateMethod = UpdateMethod.OKHTTP
+                                            }
+                                        }
+                                    )
+                                    Text("OkHTTP")
+                                }
                             }
                         }
                     }
@@ -781,59 +925,7 @@ fun MainScreen(
                 confirmButton = {
                     Button(
                         enabled = !updateInProgress,
-                        onClick = {
-                            val code = updateCode.trim()
-                            if (code.isEmpty()) {
-                                updateStatus = "Enter code"
-                                return@Button
-                            }
-
-                            try {
-                                updateInProgress = true
-                                updateProgress = 0
-                                updateStatus = "Preparing update..."
-
-                                val url = "https://nabsky.bitbucket.io/baccarat/$code.apk"
-
-                                val onProgress: (Int) -> Unit = { percent ->
-                                    updateProgress = percent
-                                }
-
-                                val onError: (String) -> Unit = { error ->
-                                    updateInProgress = false
-                                    updateStatus = error
-                                }
-
-                                when (updateMethod) {
-                                    UpdateMethod.DOWNLOAD_MANAGER -> {
-                                        downloadManagerUpdater.downloadAndInstall(
-                                            url = url,
-                                            fileName = "update.apk",
-                                            onProgress = onProgress,
-                                            onError = onError
-                                        )
-                                    }
-
-                                    UpdateMethod.OKHTTP -> {
-                                        okHttpUpdater.downloadAndInstall(
-                                            url = url,
-                                            fileName = "update.apk",
-                                            onProgress = onProgress,
-                                            onError = onError
-                                        )
-                                    }
-                                }
-
-                                showUpdateDialog = false
-                                updateCode = ""
-                                updateStatus = ""
-                                updateProgress = 0
-                                updateInProgress = false
-                            } catch (t: Throwable) {
-                                updateStatus = t.message ?: "Update failed"
-                                updateInProgress = false
-                            }
-                        }
+                        onClick = ::confirmUpdateDialog
                     ) {
                         Text("Update")
                     }
@@ -1609,4 +1701,45 @@ private fun DialogKeyHandler(
     ) {
         content()
     }
+}
+
+@Composable
+private fun SelectAllOutlinedTextField(
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    modifier: Modifier = Modifier,
+    label: @Composable (() -> Unit)? = null,
+    singleLine: Boolean = false,
+    enabled: Boolean = true,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    autoFocus: Boolean = false
+) {
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(autoFocus) {
+        if (autoFocus) {
+            focusRequester.requestFocus()
+            onValueChange(
+                value.copy(selection = TextRange(0, value.text.length))
+            )
+        }
+    }
+
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier
+            .focusRequester(focusRequester)
+            .onFocusChanged { state ->
+                if (state.isFocused) {
+                    onValueChange(
+                        value.copy(selection = TextRange(0, value.text.length))
+                    )
+                }
+            },
+        label = label,
+        singleLine = singleLine,
+        enabled = enabled,
+        keyboardOptions = keyboardOptions
+    )
 }
