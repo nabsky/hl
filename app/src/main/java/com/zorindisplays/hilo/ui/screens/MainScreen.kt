@@ -395,6 +395,16 @@ fun MainScreen(
                     .padding(top = 18.dp)
                     .zIndex(5000f)
             )
+            Text(
+                text = "RTP converges statistically. Play ≥25,000 games for a reliable estimate.",
+                fontSize = 12.sp,
+                letterSpacing = 0.5.sp,
+                color = Color(0xFFFFD54A),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 40.dp)
+                    .zIndex(5000f)
+            )
         }
 
         Text(
