@@ -65,12 +65,11 @@ import java.util.Locale
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import coil3.compose.rememberAsyncImagePainter
-import coil3.request.ImageRequest
 import com.zorindisplays.hilo.util.ApkDownloadManagerUpdater
 import com.zorindisplays.hilo.audio.GameSoundManager
 import com.zorindisplays.hilo.emulator.Emulator
@@ -82,6 +81,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlin.math.abs
+import coil3.compose.rememberAsyncImagePainter
+import coil3.request.ImageRequest
 
 enum class UpdateMethod {
     DOWNLOAD_MANAGER,
@@ -95,12 +96,14 @@ fun MainScreen(
     soundManager: GameSoundManager
 ) {
     val state by vm.state.collectAsState()
-    val overlayAmount: Long? = when (val st = state) {
-        is UiState.Ready -> st.amount
-        is UiState.Playing -> st.amount
-        is UiState.Won -> st.amount
-        is UiState.Lost -> st.lastAmount
-        else -> null
+    val overlayAmount: Long? = remember(state) {
+        when (val st = state) {
+            is UiState.Ready -> st.amount
+            is UiState.Playing -> st.amount
+            is UiState.Won -> st.amount
+            is UiState.Lost -> st.lastAmount
+            else -> null
+        }
     }
 
     val deckMode by vm.deckMode.collectAsState()
@@ -111,7 +114,7 @@ fun MainScreen(
     var tempDeckMode by remember(showDeckModeDialog, deckMode) { mutableStateOf(deckMode) }
     var tempRtpInput by remember(showDeckModeDialog, fixedRtpInput) { mutableStateOf(fixedRtpInput) }
 
-    val showTopTokens = state is UiState.AmountEntry || state is UiState.Ready || state is UiState.Playing || state is UiState.Won
+    val showTopTokens = remember(state) { state is UiState.AmountEntry || state is UiState.Ready || state is UiState.Playing || state is UiState.Won }
 
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -161,6 +164,15 @@ fun MainScreen(
         }
     }
 
+    val emulator = remember { Emulator() }
+    var showEmulatorDialog by remember { mutableStateOf(false) }
+    var emulatorBaseAmount by remember { mutableStateOf<Long?>(null) }
+    var emulatorRunning by remember { mutableStateOf(false) }
+    val emulatorInitialAmount by vm.emulatorInitialAmount.collectAsState()
+    var emulatorAmountInput by remember(showEmulatorDialog, emulatorInitialAmount) {
+        mutableStateOf(emulatorInitialAmount)
+    }
+
     var showUpdateDialog by remember { mutableStateOf(false) }
     val downloadManagerUpdater = remember { ApkDownloadManagerUpdater(context) }
     val okHttpUpdater = remember { ApkOkHttpUpdater(context) }
@@ -172,28 +184,7 @@ fun MainScreen(
     var updateInProgress by remember { mutableStateOf(false) }
     val tokensPainter = painterResource(R.drawable.tokens)
 
-    val emulator = remember { Emulator() }
-    var showEmulatorDialog by remember { mutableStateOf(false) }
-    var emulatorBaseAmount by remember { mutableStateOf<Long?>(null) }
-    var emulatorRunning by remember { mutableStateOf(false) }
-    val emulatorInitialAmount by vm.emulatorInitialAmount.collectAsState()
-    var emulatorAmountInput by remember(showEmulatorDialog, emulatorInitialAmount) {
-        mutableStateOf(emulatorInitialAmount)
-    }
-
     val isFixedRtpMode = deckMode == DeckMode.FIXED_RTP
-
-    val trophyGlowMain = if (isFixedRtpMode) {
-        Color(0x8859A8FF)
-    } else {
-        Color(0x88FFD54A)
-    }
-
-    val trophyGlowSecondary = if (isFixedRtpMode) {
-        Color(0x224C8DFF)
-    } else {
-        Color(0x33FFD54A)
-    }
 
     val versionName = remember {
         try {
@@ -202,6 +193,36 @@ fun MainScreen(
             "unknown"
         }
     }
+
+    val currentRtpText = remember(stats.totalIn, stats.totalOut) {
+        if (stats.totalIn > 0L) {
+            "%.2f".format(stats.totalOut * 100.0 / stats.totalIn.toDouble())
+        } else {
+            "0.00"
+        }
+    }
+
+    val targetRtpText = remember(isFixedRtpMode, fixedRtpInput) {
+        if (isFixedRtpMode) {
+            fixedRtpInput.ifBlank { "0" }
+        } else {
+            "Random"
+        }
+    }
+
+    val demoModeText = remember(
+        emulatorRunning,
+        stats.gamesCount,
+        currentRtpText,
+        targetRtpText
+    ) {
+        if (!emulatorRunning) {
+            ""
+        } else {
+            "DEMO MODE (Game ${stats.gamesCount}; Current RTP: $currentRtpText%; Target RTP: $targetRtpText%)"
+        }
+    }
+
 
     fun submitGuessWithBubble(guess: Guess) {
         val playing = state as? UiState.Playing ?: return
@@ -226,41 +247,6 @@ fun MainScreen(
             }
 
             guessSubmitPending = false
-        }
-    }
-
-
-    fun stopEmulator() {
-        emulatorRunning = false
-    }
-
-    fun handleManualKey(key: Key): Boolean {
-        return when (key) {
-            Key.Enter -> { vm.onEnter(); true }
-            Key.Backspace -> { vm.onBackspace(); true }
-            Key.S -> { vm.onStart(); true }
-            Key.H -> { submitGuessWithBubble(Guess.HIGHER); true }
-            Key.L -> { submitGuessWithBubble(Guess.LOWER); true }
-            Key.R -> { showDeckModeDialog = true; true }
-            Key.U -> { showUpdateDialog = true; true }
-            Key.E -> {
-                emulatorAmountInput = (emulatorBaseAmount ?: overlayAmount ?: 100L).toString()
-                showEmulatorDialog = true
-                true
-            }
-
-            Key.Zero, Key.NumPad0 -> { vm.onDigit(0); true }
-            Key.One, Key.NumPad1 -> { vm.onDigit(1); true }
-            Key.Two, Key.NumPad2 -> { vm.onDigit(2); true }
-            Key.Three, Key.NumPad3 -> { vm.onDigit(3); true }
-            Key.Four, Key.NumPad4 -> { vm.onDigit(4); true }
-            Key.Five, Key.NumPad5 -> { vm.onDigit(5); true }
-            Key.Six, Key.NumPad6 -> { vm.onDigit(6); true }
-            Key.Seven, Key.NumPad7 -> { vm.onDigit(7); true }
-            Key.Eight, Key.NumPad8 -> { vm.onDigit(8); true }
-            Key.Nine, Key.NumPad9 -> { vm.onDigit(9); true }
-
-            else -> false
         }
     }
 
@@ -334,13 +320,51 @@ fun MainScreen(
                 if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
 
                 if (emulatorRunning) {
-                    stopEmulator()
+                    emulatorRunning = false
                 }
 
-                handleManualKey(e.key)
+                when (e.key) {
+                    Key.Enter -> { vm.onEnter(); true }
+                    Key.Backspace -> { vm.onBackspace(); true }
+                    Key.S -> { vm.onStart(); true }
+                    Key.H -> { submitGuessWithBubble(Guess.HIGHER); true }
+                    Key.L -> { submitGuessWithBubble(Guess.LOWER); true }
+                    Key.R -> { showDeckModeDialog = true; true }
+                    Key.U -> { showUpdateDialog = true; true }
+                    Key.E -> {
+                        emulatorAmountInput = (emulatorBaseAmount ?: overlayAmount ?: 100L).toString()
+                        showEmulatorDialog = true
+                        true
+                    }
+                    Key.Zero, Key.NumPad0 -> { vm.onDigit(0); true }
+                    Key.One, Key.NumPad1 -> { vm.onDigit(1); true }
+                    Key.Two, Key.NumPad2 -> { vm.onDigit(2); true }
+                    Key.Three, Key.NumPad3 -> { vm.onDigit(3); true }
+                    Key.Four, Key.NumPad4 -> { vm.onDigit(4); true }
+                    Key.Five, Key.NumPad5 -> { vm.onDigit(5); true }
+                    Key.Six, Key.NumPad6 -> { vm.onDigit(6); true }
+                    Key.Seven, Key.NumPad7 -> { vm.onDigit(7); true }
+                    Key.Eight, Key.NumPad8 -> { vm.onDigit(8); true }
+                    Key.Nine, Key.NumPad9 -> { vm.onDigit(9); true }
+
+                    else -> false
+                }
             }
     ) {
         TableBackground(isFixedRtp = deckMode == DeckMode.FIXED_RTP)
+
+        if (demoModeText.isNotEmpty()) {
+            Text(
+                text = demoModeText,
+                fontSize = 18.sp,
+                letterSpacing = 0.5.sp,
+                color = Color(0xFFFFD54A),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 18.dp)
+                    .zIndex(5000f)
+            )
+        }
 
         Text(
             text = "ALL VALUES IN CFA",
@@ -353,18 +377,6 @@ fun MainScreen(
                 .zIndex(5000f)
         )
 
-        if (emulatorRunning) {
-            Text(
-                text = "DEMO MODE",
-                fontSize = 18.sp,
-                letterSpacing = 1.sp,
-                color = Color(0xFFFFD54A),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 18.dp)
-                    .zIndex(5000f)
-            )
-        }
 
         AnimatedVisibility(
             visible = showTopTokens,
@@ -423,55 +435,13 @@ fun MainScreen(
             )
         }
 
-        when (val st = state) {
-            UiState.Idle -> IdleView()
-
-            is UiState.AmountEntry -> AmountEntryView(raw = st.raw)
-
-            else -> {
-                val cards = when (st) {
-                    is UiState.Ready -> st.cards
-                    is UiState.Playing -> st.cards
-                    is UiState.Lost -> st.cards
-                    is UiState.Won -> st.cards
-                    else -> emptyList()
-                }
-
-                val revealedCount = when (st) {
-                    is UiState.Ready -> 0
-                    is UiState.Playing -> st.revealedCount
-                    is UiState.Lost -> st.revealedCount
-                    is UiState.Won -> 5
-                    else -> 0
-                }
-
-                var visibleWrongCardIndex by remember { mutableStateOf<Int?>(null) }
-
-                LaunchedEffect(state) {
-                    when (val st = state) {
-                        is UiState.Lost -> {
-                            visibleWrongCardIndex = null
-                            delay(1050) // 1000мс flip + чуть буфера
-                            visibleWrongCardIndex = st.revealedCount - 1
-                        }
-
-                        else -> {
-                            visibleWrongCardIndex = null
-                        }
-                    }
-                }
-
-                RoundView(
-                    cards = cards,
-                    revealedCount = revealedCount,
-                    wrongCardIndex = visibleWrongCardIndex,
-                    soundManager = soundManager,
-                    imageLoader = imageLoader,
-                    guessBubble = guessBubble,
-                    guessBubbleCardIndex = guessBubbleCardIndex
-                )
-            }
-        }
+        GameContent(
+            state = state,
+            soundManager = soundManager,
+            imageLoader = imageLoader,
+            guessBubble = guessBubble,
+            guessBubbleCardIndex = guessBubbleCardIndex
+        )
 
         val loseDimAlpha by animateFloatAsState(
             targetValue = if (showLoseDim) 0.35f else 0f,
@@ -489,9 +459,9 @@ fun MainScreen(
             )
         }
 
-        val playing = state as? UiState.Playing
-        val showConfetti = playing?.showConfetti == true
-        val confettiTick = playing?.confettiTick ?: 0
+        val playing = remember(state) { state as? UiState.Playing }
+        val showConfetti = remember(playing) { playing?.showConfetti == true }
+        val confettiTick = remember(playing) { playing?.confettiTick ?: 0 }
 
         if (showConfetti) {
             key(confettiTick) {
@@ -506,237 +476,19 @@ fun MainScreen(
         val isWon = state is UiState.Won
 
         if (isWon) {
-            var showTrophy by remember { mutableStateOf(false) }
-            var starsActive by remember { mutableStateOf(false) }
-
-            LaunchedEffect(isWon) {
-                showTrophy = false
-                starsActive = false
-                delay(180)
-                showTrophy = true
-            }
-
-            if (showTrophy) {
-                val trophyOffsetY = remember { Animatable(-900f) }
-                val trophyScale = remember { Animatable(0.82f) }
-                val trophyAlpha = remember { Animatable(0f) }
-                val trophyRotation = remember { Animatable(-8f) }
-
-                val glowAlpha = remember { Animatable(0f) }
-                val flashAlpha = remember { Animatable(0f) }
-
-                LaunchedEffect(Unit) {
-                    coroutineScope {
-                        launch {
-                            trophyAlpha.animateTo(1f, tween(180))
-                        }
-
-                        launch {
-                            glowAlpha.animateTo(
-                                targetValue = 1f,
-                                animationSpec = tween(550, easing = FastOutSlowInEasing)
-                            )
-                        }
-
-                        launch {
-                            flashAlpha.animateTo(1f, tween(100))
-                            flashAlpha.animateTo(0f, tween(220))
-                        }
-
-                        launch {
-                            trophyRotation.animateTo(
-                                targetValue = 0f,
-                                animationSpec = tween(360, easing = LinearOutSlowInEasing)
-                            )
-                        }
-
-                        launch {
-                            // Сразу растёт во время падения, без паузы после приземления
-                            trophyScale.animateTo(
-                                targetValue = 1.12f,
-                                animationSpec = tween(420, easing = LinearOutSlowInEasing)
-                            )
-                            trophyScale.animateTo(
-                                targetValue = 1f,
-                                animationSpec = tween(180, easing = FastOutSlowInEasing)
-                            )
-                        }
-
-                        trophyOffsetY.animateTo(
-                            targetValue = 28f,
-                            animationSpec = tween(
-                                durationMillis = 420,
-                                easing = LinearOutSlowInEasing
-                            )
-                        )
-
-                        trophyOffsetY.animateTo(
-                            targetValue = 0f,
-                            animationSpec = spring(
-                                dampingRatio = 0.55f,
-                                stiffness = 520f
-                            )
-                        )
-
-                        starsActive = true
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .zIndex(1000f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.18f))
-                    )
-
-                    WinKonfettiOverlay(
-                        modifier = Modifier
-                            .fillMaxSize()
-                    )
-
-                    Canvas(
-                        modifier = Modifier
-                            .size(560.dp)
-                            .graphicsLayer { alpha = glowAlpha.value }
-                    ) {
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    trophyGlowMain,
-                                    trophyGlowSecondary,
-                                    Color.Transparent
-                                )
-                            ),
-                            radius = size.minDimension * 0.48f
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer { alpha = flashAlpha.value }
-                            .background(Color.White.copy(alpha = 0.35f))
-                    )
-
-                    // Сам кубок
-                    Image(
-                        painter = painterResource(R.drawable.trophy),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .offset(y = trophyOffsetY.value.dp + 20.dp)
-                            .graphicsLayer {
-                                alpha = trophyAlpha.value
-                                scaleX = trophyScale.value
-                                scaleY = trophyScale.value
-                                rotationZ = trophyRotation.value
-                            }
-                            .size(420.dp)
-                    )
-
-                    // Звёздочки ПОВЕРХ кубка, мигают по очереди бесконечно
-                    if (starsActive) {
-                        val starsTransition = rememberInfiniteTransition(label = "trophyStars")
-
-                        val leftStarAlpha by starsTransition.animateFloat(
-                            initialValue = 0.18f,
-                            targetValue = 1f,
-                            animationSpec = infiniteRepeatable(
-                                animation = keyframes {
-                                    durationMillis = 1800
-                                    0.18f at 0
-                                    0.18f at 120
-                                    1f at 260
-                                    0.35f at 430
-                                    0.18f at 600
-                                    0.18f at 1800
-                                },
-                                repeatMode = RepeatMode.Restart
-                            ),
-                            label = "leftStarAlpha"
-                        )
-
-                        val topStarAlpha by starsTransition.animateFloat(
-                            initialValue = 0.18f,
-                            targetValue = 1f,
-                            animationSpec = infiniteRepeatable(
-                                animation = keyframes {
-                                    durationMillis = 1800
-                                    0.18f at 0
-                                    0.18f at 620
-                                    1f at 760
-                                    0.35f at 930
-                                    0.18f at 1100
-                                    0.18f at 1800
-                                },
-                                repeatMode = RepeatMode.Restart
-                            ),
-                            label = "topStarAlpha"
-                        )
-
-                        val rightStarAlpha by starsTransition.animateFloat(
-                            initialValue = 0.18f,
-                            targetValue = 1f,
-                            animationSpec = infiniteRepeatable(
-                                animation = keyframes {
-                                    durationMillis = 1800
-                                    0.18f at 0
-                                    0.18f at 1120
-                                    1f at 1260
-                                    0.35f at 1430
-                                    0.18f at 1600
-                                    0.18f at 1800
-                                },
-                                repeatMode = RepeatMode.Restart
-                            ),
-                            label = "rightStarAlpha"
-                        )
-
-                        Image(
-                            painter = painterResource(R.drawable.spark_star),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .offset(x = (-108).dp, y = (-88).dp)
-                                .graphicsLayer { alpha = leftStarAlpha }
-                                .size(42.dp)
-                                .zIndex(1100f)
-                        )
-
-                        Image(
-                            painter = painterResource(R.drawable.spark_star),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .offset(y = (-178).dp)
-                                .graphicsLayer { alpha = topStarAlpha }
-                                .size(48.dp)
-                                .zIndex(1100f)
-                        )
-
-                        Image(
-                            painter = painterResource(R.drawable.spark_star),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .offset(x = 112.dp, y = (-70).dp)
-                                .graphicsLayer { alpha = rightStarAlpha }
-                                .size(36.dp)
-                                .zIndex(1100f)
-                        )
-                    }
-                }
-            }
+            WinOverlay(isFixedRtpMode = isFixedRtpMode)
         }
 
 
-        val bottomOverlayText = when (val st = state) {
-            is UiState.Ready -> "PRESS START TO BEGIN"
-            is UiState.Playing -> if (st.awaitingGuess) "HIGHER OR LOWER" else ""
-            is UiState.Lost -> if (showLoseText) "BETTER LUCK NEXT TIME!" else ""
-            is UiState.Won -> "YOU WON!"
-            else -> ""
+
+        val bottomOverlayText = remember(state, showLoseText) {
+            when (val st = state) {
+                is UiState.Ready -> "PRESS START TO BEGIN"
+                is UiState.Playing -> if (st.awaitingGuess) "HIGHER OR LOWER" else ""
+                is UiState.Lost -> if (showLoseText) "BETTER LUCK NEXT TIME!" else ""
+                is UiState.Won -> "YOU WON!"
+                else -> ""
+            }
         }
 
         if (bottomOverlayText.isNotEmpty()) {
@@ -890,54 +642,59 @@ fun MainScreen(
             )
         }
 
+        fun confirmEmulatorDialog() {
+            val finalAmount = emulatorAmountInput
+                .filter { it.isDigit() }
+                .ifBlank { "100000" }
+
+            vm.setEmulatorInitialAmount(finalAmount, context)
+
+            val amount = finalAmount.toLongOrNull()
+            if (amount != null && amount > 0L) {
+                emulatorBaseAmount = amount
+                vm.resetToIdle()
+                emulatorRunning = true
+                showEmulatorDialog = false
+            }
+        }
+
         if (showEmulatorDialog) {
             AlertDialog(
                 onDismissRequest = { showEmulatorDialog = false },
-                title = {
-                    Text("Demo emulator")
-                },
+                title = { Text("Demo emulator") },
                 text = {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    DialogKeyHandler(
+                        onConfirm = ::confirmEmulatorDialog,
+                        onDismiss = { showEmulatorDialog = false }
                     ) {
-                        Text("Press any key to stop the emulator and continue manually.")
-
-                        OutlinedTextField(
-                            value = emulatorAmountInput,
-                            onValueChange = {
-                                emulatorAmountInput = it.filter { ch -> ch.isDigit() }.take(9)
-                            },
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Initial amount") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Number
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text("Press any key to stop the emulator and continue manually.")
+
+                            OutlinedTextField(
+                                value = emulatorAmountInput,
+                                onValueChange = {
+                                    emulatorAmountInput = it.filter { ch -> ch.isDigit() }.take(9)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("Initial amount") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Number
+                                )
                             )
-                        )
+                        }
                     }
                 },
                 confirmButton = {
-                    Button(
-                        onClick = {
-                            val finalAmount = emulatorAmountInput.filter { it.isDigit() }.ifBlank { "100000" }
-                            vm.setEmulatorInitialAmount(finalAmount, context)
-                            val amount = finalAmount.toLongOrNull()
-                            if (amount != null && amount > 0L) {
-                                emulatorBaseAmount = amount
-                                vm.resetToIdle()
-                                emulatorRunning = true
-                                showEmulatorDialog = false
-                            }
-                        }
-                    ) {
+                    Button(onClick = ::confirmEmulatorDialog) {
                         Text("OK")
                     }
                 },
                 dismissButton = {
-                    TextButton(
-                        onClick = { showEmulatorDialog = false }
-                    ) {
+                    TextButton(onClick = { showEmulatorDialog = false }) {
                         Text("Cancel")
                     }
                 }
@@ -1096,102 +853,415 @@ fun MainScreen(
             )
         }
 
-        if (overlayAmount != null) {
-            val isWon = state is UiState.Won
-            val isLost = state is UiState.Lost
+        overlayAmount?.let { amount ->
+            AmountOverlay(
+                amount = amount,
+                isWon = state is UiState.Won,
+                isLost = state is UiState.Lost,
+                startLoseAmountDrop = startLoseAmountDrop
+            )
+        }
 
-            val scale by rememberInfiniteTransition(label = "amountPulse")
-                .animateFloat(
-                    initialValue = 1f,
-                    targetValue = if (isWon) 1.06f else 1f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(700),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "amountScale"
-                )
+    }
+}
 
-            val amountOffsetY = remember { Animatable(0f) }
-            val amountAlpha = remember { Animatable(1f) }
 
-            LaunchedEffect(state, startLoseAmountDrop) {
-                if (isLost && startLoseAmountDrop) {
-                    amountOffsetY.snapTo(0f)
-                    amountAlpha.snapTo(1f)
 
-                    coroutineScope {
-                        launch {
-                            amountOffsetY.animateTo(
-                                targetValue = 900f,
-                                animationSpec = tween(
-                                    durationMillis = 380,
-                                    easing = FastOutSlowInEasing
-                                )
-                            )
-                        }
-                        launch {
-                            amountAlpha.animateTo(
-                                targetValue = 0f,
-                                animationSpec = tween(320)
-                            )
-                        }
+@Composable
+private fun GameContent(
+    state: UiState,
+    soundManager: GameSoundManager,
+    imageLoader: ImageLoader,
+    guessBubble: Guess?,
+    guessBubbleCardIndex: Int?
+) {
+    when (val st = state) {
+        UiState.Idle -> IdleView()
+        is UiState.AmountEntry -> AmountEntryView(raw = st.raw)
+        else -> {
+            val cards = when (st) {
+                is UiState.Ready -> st.cards
+                is UiState.Playing -> st.cards
+                is UiState.Lost -> st.cards
+                is UiState.Won -> st.cards
+                else -> emptyList()
+            }
+
+            val revealedCount = when (st) {
+                is UiState.Ready -> 0
+                is UiState.Playing -> st.revealedCount
+                is UiState.Lost -> st.revealedCount
+                is UiState.Won -> 5
+                else -> 0
+            }
+
+            var visibleWrongCardIndex by remember(state) { mutableStateOf<Int?>(null) }
+
+            LaunchedEffect(state) {
+                when (val currentState = state) {
+                    is UiState.Lost -> {
+                        visibleWrongCardIndex = null
+                        delay(1050)
+                        visibleWrongCardIndex = currentState.revealedCount - 1
                     }
-                } else if (!isLost) {
-                    amountOffsetY.snapTo(0f)
-                    amountAlpha.snapTo(1f)
+
+                    else -> {
+                        visibleWrongCardIndex = null
+                    }
                 }
             }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(3000f),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = JackpotTopAmountPadding)
-                        .offset(y = amountOffsetY.value.dp)
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            alpha = amountAlpha.value
-                        }
-                ) {
-                    if (isWon) {
-                        Canvas(
-                            modifier = Modifier
-                                .size(420.dp)
-                                .alpha(0.75f)
-                        ) {
-                            drawCircle(
-                                brush = Brush.radialGradient(
-                                    colors = listOf(
-                                        Color(0x88FFD54A),
-                                        Color(0x33FFD54A),
-                                        Color.Transparent
-                                    )
-                                ),
-                                radius = size.minDimension * 0.45f
-                            )
-                        }
-                    }
+            RoundView(
+                cards = cards,
+                revealedCount = revealedCount,
+                wrongCardIndex = visibleWrongCardIndex,
+                soundManager = soundManager,
+                imageLoader = imageLoader,
+                guessBubble = guessBubble,
+                guessBubbleCardIndex = guessBubbleCardIndex
+            )
+        }
+    }
+}
 
-                    if (state is UiState.Won) {
-                        WinAnimatedAmountOverlay(
-                            amount = overlayAmount,
-                            modifier = Modifier.offset(y = -30.dp))
-                    } else {
-                        AnimatedAmountText(
-                            targetAmount = overlayAmount,
-                            format = ::formatAmount,
-                            fontSize = 100.sp,
-                            strokeWidth = 20f,
-                            animateOnFirst = false,
-                            modifier = Modifier.offset(y = 0.dp)
-                        )
-                    }
+@Composable
+private fun WinOverlay(
+    isFixedRtpMode: Boolean
+) {
+    val trophyGlowMain = if (isFixedRtpMode) {
+        Color(0x8859A8FF)
+    } else {
+        Color(0x88FFD54A)
+    }
+
+    val trophyGlowSecondary = if (isFixedRtpMode) {
+        Color(0x224C8DFF)
+    } else {
+        Color(0x33FFD54A)
+    }
+
+    var showTrophy by remember { mutableStateOf(false) }
+    var starsActive by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        showTrophy = false
+        starsActive = false
+        delay(180)
+        showTrophy = true
+    }
+
+    if (!showTrophy) return
+
+    val trophyOffsetY = remember { Animatable(-900f) }
+    val trophyScale = remember { Animatable(0.82f) }
+    val trophyAlpha = remember { Animatable(0f) }
+    val trophyRotation = remember { Animatable(-8f) }
+    val glowAlpha = remember { Animatable(0f) }
+    val flashAlpha = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        coroutineScope {
+            launch {
+                trophyAlpha.animateTo(1f, tween(180))
+            }
+
+            launch {
+                glowAlpha.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(550, easing = FastOutSlowInEasing)
+                )
+            }
+
+            launch {
+                flashAlpha.animateTo(1f, tween(100))
+                flashAlpha.animateTo(0f, tween(220))
+            }
+
+            launch {
+                trophyRotation.animateTo(
+                    targetValue = 0f,
+                    animationSpec = tween(360, easing = LinearOutSlowInEasing)
+                )
+            }
+
+            launch {
+                trophyScale.animateTo(
+                    targetValue = 1.12f,
+                    animationSpec = tween(420, easing = LinearOutSlowInEasing)
+                )
+                trophyScale.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(180, easing = FastOutSlowInEasing)
+                )
+            }
+
+            trophyOffsetY.animateTo(
+                targetValue = 28f,
+                animationSpec = tween(
+                    durationMillis = 420,
+                    easing = LinearOutSlowInEasing
+                )
+            )
+
+            trophyOffsetY.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = 0.55f,
+                    stiffness = 520f
+                )
+            )
+
+            starsActive = true
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(1000f),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.18f))
+        )
+
+        WinKonfettiOverlay(
+            modifier = Modifier.fillMaxSize()
+        )
+
+        Canvas(
+            modifier = Modifier
+                .size(560.dp)
+                .graphicsLayer { alpha = glowAlpha.value }
+        ) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        trophyGlowMain,
+                        trophyGlowSecondary,
+                        Color.Transparent
+                    )
+                ),
+                radius = size.minDimension * 0.48f
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = flashAlpha.value }
+                .background(Color.White.copy(alpha = 0.35f))
+        )
+
+        Image(
+            painter = painterResource(R.drawable.trophy),
+            contentDescription = null,
+            modifier = Modifier
+                .offset(y = trophyOffsetY.value.dp + 20.dp)
+                .graphicsLayer {
+                    alpha = trophyAlpha.value
+                    scaleX = trophyScale.value
+                    scaleY = trophyScale.value
+                    rotationZ = trophyRotation.value
                 }
+                .size(420.dp)
+        )
+
+        if (starsActive) {
+            TrophyStars()
+        }
+    }
+}
+
+@Composable
+private fun TrophyStars() {
+    val starsTransition = rememberInfiniteTransition(label = "trophyStars")
+
+    val leftStarAlpha by starsTransition.animateFloat(
+        initialValue = 0.18f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 1800
+                0.18f at 0
+                0.18f at 120
+                1f at 260
+                0.35f at 430
+                0.18f at 600
+                0.18f at 1800
+            },
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "leftStarAlpha"
+    )
+
+    val topStarAlpha by starsTransition.animateFloat(
+        initialValue = 0.18f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 1800
+                0.18f at 0
+                0.18f at 620
+                1f at 760
+                0.35f at 930
+                0.18f at 1100
+                0.18f at 1800
+            },
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "topStarAlpha"
+    )
+
+    val rightStarAlpha by starsTransition.animateFloat(
+        initialValue = 0.18f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 1800
+                0.18f at 0
+                0.18f at 1120
+                1f at 1260
+                0.35f at 1430
+                0.18f at 1600
+                0.18f at 1800
+            },
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rightStarAlpha"
+    )
+
+    Image(
+        painter = painterResource(R.drawable.spark_star),
+        contentDescription = null,
+        modifier = Modifier
+            .offset(x = (-108).dp, y = (-88).dp)
+            .graphicsLayer { alpha = leftStarAlpha }
+            .size(42.dp)
+            .zIndex(1100f)
+    )
+
+    Image(
+        painter = painterResource(R.drawable.spark_star),
+        contentDescription = null,
+        modifier = Modifier
+            .offset(y = (-178).dp)
+            .graphicsLayer { alpha = topStarAlpha }
+            .size(48.dp)
+            .zIndex(1100f)
+    )
+
+    Image(
+        painter = painterResource(R.drawable.spark_star),
+        contentDescription = null,
+        modifier = Modifier
+            .offset(x = 112.dp, y = (-70).dp)
+            .graphicsLayer { alpha = rightStarAlpha }
+            .size(36.dp)
+            .zIndex(1100f)
+    )
+}
+
+@Composable
+private fun AmountOverlay(
+    amount: Long,
+    isWon: Boolean,
+    isLost: Boolean,
+    startLoseAmountDrop: Boolean
+) {
+    val scale by rememberInfiniteTransition(label = "amountPulse")
+        .animateFloat(
+            initialValue = 1f,
+            targetValue = if (isWon) 1.06f else 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(700),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "amountScale"
+        )
+
+    val amountOffsetY = remember { Animatable(0f) }
+    val amountAlpha = remember { Animatable(1f) }
+
+    LaunchedEffect(isLost, startLoseAmountDrop) {
+        if (isLost && startLoseAmountDrop) {
+            amountOffsetY.snapTo(0f)
+            amountAlpha.snapTo(1f)
+
+            coroutineScope {
+                launch {
+                    amountOffsetY.animateTo(
+                        targetValue = 900f,
+                        animationSpec = tween(
+                            durationMillis = 380,
+                            easing = FastOutSlowInEasing
+                        )
+                    )
+                }
+                launch {
+                    amountAlpha.animateTo(
+                        targetValue = 0f,
+                        animationSpec = tween(320)
+                    )
+                }
+            }
+        } else if (!isLost) {
+            amountOffsetY.snapTo(0f)
+            amountAlpha.snapTo(1f)
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(3000f),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        Box(
+            modifier = Modifier
+                .padding(top = JackpotTopAmountPadding)
+                .offset(y = amountOffsetY.value.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = amountAlpha.value
+                }
+        ) {
+            if (isWon) {
+                Canvas(
+                    modifier = Modifier
+                        .size(420.dp)
+                        .alpha(0.75f)
+                ) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0x88FFD54A),
+                                Color(0x33FFD54A),
+                                Color.Transparent
+                            )
+                        ),
+                        radius = size.minDimension * 0.45f
+                    )
+                }
+            }
+
+            if (isWon) {
+                WinAnimatedAmountOverlay(
+                    amount = amount,
+                    modifier = Modifier.offset(y = -30.dp)
+                )
+            } else {
+                AnimatedAmountText(
+                    targetAmount = amount,
+                    format = ::formatAmount,
+                    fontSize = 100.sp,
+                    strokeWidth = 20f,
+                    animateOnFirst = false,
+                    modifier = Modifier.offset(y = 0.dp)
+                )
             }
         }
     }
@@ -1266,7 +1336,6 @@ private fun RoundView(
                     Box(
                         modifier = Modifier
                             .matchParentSize()
-                            // подгони под реальный размер картинки
                             .padding(horizontal = 2.dp, vertical = 7.dp)
                     ) {
                         FlipCard(
@@ -1350,7 +1419,10 @@ private fun FlipCard(
 
         rotation.animateTo(
             targetValue = 90f,
-            animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+            animationSpec = tween(
+                durationMillis = 500,
+                easing = FastOutSlowInEasing
+            )
         )
 
         shownFaceUp = faceUp
@@ -1358,34 +1430,40 @@ private fun FlipCard(
 
         rotation.animateTo(
             targetValue = 0f,
-            animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+            animationSpec = tween(
+                durationMillis = 500,
+                easing = FastOutSlowInEasing
+            )
         )
     }
 
-
-    val url = if (shownFaceUp && card != null) card.assetUrl() else cardBackAssetUrl()
+    val url = if (shownFaceUp && card != null) {
+        card.assetUrl()
+    } else {
+        cardBackAssetUrl()
+    }
 
     val isAnimating = abs(rotation.value) > 0.5f
+
+    val imagePainter = rememberAsyncImagePainter(
+        model = ImageRequest.Builder(context)
+            .data(url)
+            .size(360, 520)
+            .build(),
+        imageLoader = imageLoader
+    )
 
     Box(
         modifier = modifier
             .graphicsLayer {
                 rotationY = rotation.value
-                cameraDistance = 24f * density
+                cameraDistance = 28f * density
                 shape = RoundedCornerShape(10.dp)
                 clip = !isAnimating
             }
     ) {
-        val painter = rememberAsyncImagePainter(
-            model = ImageRequest.Builder(context)
-                .data(url)
-                .size(360, 520)   // примерно 2x от размера карты
-                .build(),
-            imageLoader = imageLoader
-        )
-
         Image(
-            painter = painter,
+            painter = imagePainter,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.FillBounds
@@ -1499,5 +1577,36 @@ private fun WrongCardOverlay(
                     )
                 )
         )
+    }
+}
+
+@Composable
+private fun DialogKeyHandler(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+
+            when (event.key) {
+                Key.Enter,
+                Key.NumPadEnter -> {
+                    onConfirm()
+                    true
+                }
+
+                Key.Escape,
+                Key.Back -> {
+                    onDismiss()
+                    true
+                }
+
+                else -> false
+            }
+        }
+    ) {
+        content()
     }
 }
