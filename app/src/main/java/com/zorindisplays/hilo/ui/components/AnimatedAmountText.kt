@@ -22,11 +22,10 @@ fun AnimatedAmountText(
     textAlign: TextAlign = TextAlign.Center,
     animateOnFirst: Boolean = false,
     countDurationMs: Int = 650,
-    flashDurationMs: Int = 180
+    flashDurationMs: Int = 180,
+    shiny: Boolean = false
 ) {
     val amountAnim = remember { Animatable(targetAmount.toFloat()) }
-
-    // Вспышка
     val scaleAnim = remember { Animatable(1f) }
     val alphaAnim = remember { Animatable(1f) }
 
@@ -50,7 +49,6 @@ fun AnimatedAmountText(
         isFirst = false
 
         if (changed) {
-            // pop + flash
             scaleAnim.snapTo(1f)
             alphaAnim.snapTo(1f)
 
@@ -91,6 +89,7 @@ fun AnimatedAmountText(
         fontSize = fontSize,
         strokeWidth = strokeWidth,
         textAlign = textAlign,
+        shiny = shiny,
         modifier = modifier.graphicsLayer {
             scaleX = scaleAnim.value
             scaleY = scaleAnim.value

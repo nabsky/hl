@@ -34,20 +34,10 @@ fun GoldShineText(
     fontSize: TextUnit = 64.sp,
     strokeWidth: Float = 20f,
     textAlign: TextAlign = TextAlign.Center,
-    shineDurationMs: Int = 1800,
-    shineAlpha: Float = 0.45f
+    shiny: Boolean = false,
+    shineDurationMs: Int = 2200,
+    shineAlpha: Float = 0.32f
 ) {
-    val transition = rememberInfiniteTransition(label = "goldShine")
-    val t by transition.animateFloat(
-        initialValue = -0.6f,
-        targetValue = 1.6f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(shineDurationMs, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "shineT"
-    )
-
     val goldBrush = Brush.linearGradient(
         colors = listOf(
             Color(0xFFFFF3B0),
@@ -68,47 +58,61 @@ fun GoldShineText(
     )
 
     Box(modifier = modifier) {
-
-        // 1) Обводка
         BasicText(
             text = text,
             style = baseStyle.copy(
-                color = Color(0xFF3a2a18),
+                color = Color(0xFF3A2A18),
                 drawStyle = Stroke(width = strokeWidth)
             )
         )
 
-        // 2) Заливка + shine
-        BasicText(
-            text = text,
-            style = baseStyle.copy(brush = goldBrush),
-            modifier = Modifier
-                // ВАЖНО: изолируем слой, чтобы blendMode работал только по пикселям текста
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithCache {
-                    val band = size.width * 0.35f
-                    val x = size.width * t
+        if (!shiny) {
+            BasicText(
+                text = text,
+                style = baseStyle.copy(brush = goldBrush)
+            )
+        } else {
+            val transition = rememberInfiniteTransition(label = "goldShine")
+            val t by transition.animateFloat(
+                initialValue = -0.6f,
+                targetValue = 1.6f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(shineDurationMs, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "shineT"
+            )
 
-                    val shineBrush = Brush.linearGradient(
-                        colorStops = arrayOf(
-                            0f to Color.Transparent,
-                            0.5f to Color.White,
-                            1f to Color.Transparent
-                        ),
-                        start = Offset(x - band, 0f),
-                        end = Offset(x + band, size.height),
-                        tileMode = TileMode.Clamp
-                    )
-
-                    onDrawWithContent {
-                        drawContent()
-                        drawRect(
-                            brush = shineBrush,
-                            alpha = shineAlpha,
-                            blendMode = BlendMode.SrcAtop
-                        )
+            BasicText(
+                text = text,
+                style = baseStyle.copy(brush = goldBrush),
+                modifier = Modifier
+                    .graphicsLayer {
+                        compositingStrategy = CompositingStrategy.Offscreen
                     }
-                }
-        )
+                    .drawWithCache {
+                        val band = size.width * 0.30f
+                        val x = size.width * t
+
+                        val shineBrush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.White.copy(alpha = shineAlpha),
+                                Color.Transparent
+                            ),
+                            start = Offset(x - band, 0f),
+                            end = Offset(x + band, size.height)
+                        )
+
+                        onDrawWithContent {
+                            drawContent()
+                            drawRect(
+                                brush = shineBrush,
+                                blendMode = BlendMode.SrcAtop
+                            )
+                        }
+                    }
+            )
+        }
     }
 }

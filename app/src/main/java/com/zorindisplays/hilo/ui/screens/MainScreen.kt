@@ -537,7 +537,8 @@ fun MainScreen(
                             modifier = Modifier.offset(x = 10.dp),
                             text = bottomOverlayText,
                             fontSize = 42.sp,
-                            strokeWidth = 20f
+                            strokeWidth = 20f,
+                            shiny = true
                         )
                     } else {
                         AnimatedVisibility(
@@ -1352,6 +1353,7 @@ private fun AmountOverlay(
                     fontSize = 100.sp,
                     strokeWidth = 20f,
                     animateOnFirst = false,
+                    shiny = false,
                     modifier = Modifier.offset(y = 0.dp)
                 )
             }
@@ -1383,7 +1385,8 @@ private fun AmountEntryView(raw: String) {
             GoldShineText(
                 text = formatAmount(raw.toLongOrNull() ?: 0L),
                 fontSize = 100.sp,
-                strokeWidth = 20f
+                strokeWidth = 20f,
+                shiny = false
             )
         }
 
@@ -1594,7 +1597,8 @@ private fun WinAnimatedAmountOverlay(
         text = formatAmount(shownAmount),
         fontSize = 100.sp,
         strokeWidth = 20f,
-        modifier = modifier
+        modifier = modifier,
+        shiny = true
     )
 }
 
