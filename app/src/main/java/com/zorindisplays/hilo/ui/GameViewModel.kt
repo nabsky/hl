@@ -521,19 +521,32 @@ class GameViewModel : ViewModel() {
                             playWinnerSound = true
                         )
                     } else {
-                        _state.update { cur ->
-                            val p = cur as? UiState.Playing ?: return@update cur
-                            p.copy(
-                                cards = updatedCards,
-                                amount = doubled,
-                                revealedCount = newRevealed,
-                                awaitingGuess = true,
-                                showConfetti = true,
-                                confettiTick = p.confettiTick + 1,
-                                playCoinSound = true
-                            )
+                        // 1) сначала только переворот карты
+                        _state.value = st.copy(
+                            cards = updatedCards,
+                            revealedCount = newRevealed,
+                            awaitingGuess = false
+                        )
+                        saveGameStateIfPossible()
+
+                        // 2) потом монеты и рост суммы
+                        viewModelScope.launch {
+                            delay(1000)
+
+                            _state.update { cur ->
+                                val p = cur as? UiState.Playing ?: return@update cur
+                                p.copy(
+                                    amount = doubled,
+                                    awaitingGuess = true,
+                                    showConfetti = true,
+                                    confettiTick = p.confettiTick + 1,
+                                    playCoinSound = true
+                                )
+                            }
+
+                            scheduleConfettiOff()
+                            saveGameStateIfPossible()
                         }
-                        scheduleConfettiOff()
                     }
                 }
             }

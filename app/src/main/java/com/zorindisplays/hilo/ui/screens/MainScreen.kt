@@ -1,5 +1,6 @@
 package com.zorindisplays.hilo.ui.screens
 
+import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -47,7 +48,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.ImageLoader
-import coil3.compose.AsyncImage
 import com.zorindisplays.hilo.R
 import com.zorindisplays.hilo.model.Card
 import com.zorindisplays.hilo.model.Guess
@@ -64,8 +64,6 @@ import java.text.DecimalFormatSymbols
 import java.util.Locale
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -215,7 +213,25 @@ fun MainScreen(
 
     val tokensPainter = painterResource(R.drawable.tokens)
 
-    val isFixedRtpMode = deckMode == DeckMode.FIXED_RTP
+    val bootDeckMode = remember {
+        val prefs = context.getSharedPreferences("hilo_settings", Context.MODE_PRIVATE)
+        val modeName = prefs.getString("deck_mode", DeckMode.RANDOM_DECK.name)
+        try {
+            DeckMode.valueOf(modeName ?: DeckMode.RANDOM_DECK.name)
+        } catch (_: Exception) {
+            DeckMode.RANDOM_DECK
+        }
+    }
+
+    val effectiveDeckMode = remember(deckMode, bootDeckMode) {
+        if (deckMode == DeckMode.RANDOM_DECK && bootDeckMode == DeckMode.FIXED_RTP) {
+            bootDeckMode
+        } else {
+            deckMode
+        }
+    }
+
+    val isFixedRtpMode = effectiveDeckMode == DeckMode.FIXED_RTP
 
     val versionName = remember {
         try {
@@ -382,7 +398,7 @@ fun MainScreen(
                 }
             }
     ) {
-        TableBackground(isFixedRtp = deckMode == DeckMode.FIXED_RTP)
+        TableBackground(isFixedRtp = isFixedRtpMode)
 
         if (demoModeText.isNotEmpty()) {
             Text(
@@ -1729,13 +1745,12 @@ private fun SelectAllOutlinedTextField(
     autoFocus: Boolean = false
 ) {
     val focusRequester = remember { FocusRequester() }
+    var selectAllOnNextFocus by remember { mutableStateOf(autoFocus) }
+    var wasFocused by remember { mutableStateOf(false) }
 
     LaunchedEffect(autoFocus) {
         if (autoFocus) {
             focusRequester.requestFocus()
-            onValueChange(
-                value.copy(selection = TextRange(0, value.text.length))
-            )
         }
     }
 
@@ -1745,10 +1760,18 @@ private fun SelectAllOutlinedTextField(
         modifier = modifier
             .focusRequester(focusRequester)
             .onFocusChanged { state ->
-                if (state.isFocused) {
+                val justFocused = state.isFocused && !wasFocused
+                wasFocused = state.isFocused
+
+                if (justFocused && selectAllOnNextFocus) {
                     onValueChange(
                         value.copy(selection = TextRange(0, value.text.length))
                     )
+                    selectAllOnNextFocus = false
+                }
+
+                if (!state.isFocused) {
+                    selectAllOnNextFocus = true
                 }
             },
         label = label,
