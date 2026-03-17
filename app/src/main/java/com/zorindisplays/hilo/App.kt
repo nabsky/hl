@@ -1,7 +1,6 @@
 package com.zorindisplays.hilo
 
 import android.media.MediaPlayer
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -10,14 +9,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.zIndex
 import coil3.request.ImageRequest
 import com.zorindisplays.hilo.audio.GameSoundManager
 import com.zorindisplays.hilo.model.Rank
@@ -66,37 +62,12 @@ fun App(
                 .build()
         )
     }
-
-    val fgRes = when (state) {
-        UiState.Idle -> null
-        is UiState.Playing -> when ((state as UiState.Playing).revealedCount) {
-            1 -> null
-            2 -> R.drawable.fg_02
-            3 -> R.drawable.fg_03
-            4 -> R.drawable.fg_04
-            else -> R.drawable.fg_05
-        }
-        is UiState.Won -> R.drawable.fg_05
-        else -> null
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
         MainScreen(
             imageLoader = imageLoader,
             vm = vm,
             soundManager = soundManager
         )
-
-        if(fgRes != null) {
-            Image(
-                painter = painterResource(fgRes),
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(1f),
-                contentScale = ContentScale.Crop
-            )
-        }
     }
 
     var coinPlayer by remember { mutableStateOf<MediaPlayer?>(null) }

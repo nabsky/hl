@@ -486,12 +486,23 @@ class GameViewModel : ViewModel() {
             CompareResult.TIE -> {
                 val newRevealed = st.revealedCount + 1
                 if (newRevealed >= 5) {
-                    recordGameWon(st.amount)
-                    _state.value = UiState.Won(
-                        amount = st.amount,
+                    _state.value = st.copy(
                         cards = updatedCards,
-                        playWinnerSound = true
+                        revealedCount = newRevealed,
+                        awaitingGuess = false
                     )
+                    saveGameStateIfPossible()
+
+                    viewModelScope.launch {
+                        delay(1000)
+                        recordGameWon(st.amount)
+                        _state.value = UiState.Won(
+                            amount = st.amount,
+                            cards = updatedCards,
+                            playWinnerSound = true
+                        )
+                        saveGameStateIfPossible()
+                    }
                 } else {
                     _state.value = st.copy(
                         cards = updatedCards,
@@ -514,12 +525,23 @@ class GameViewModel : ViewModel() {
                     val newRevealed = st.revealedCount + 1
 
                     if (newRevealed >= 5) {
-                        recordGameWon(doubled)
-                        _state.value = UiState.Won(
-                            amount = doubled,
+                        _state.value = st.copy(
                             cards = updatedCards,
-                            playWinnerSound = true
+                            revealedCount = newRevealed,
+                            awaitingGuess = false
                         )
+                        saveGameStateIfPossible()
+
+                        viewModelScope.launch {
+                            delay(1000)
+                            recordGameWon(doubled)
+                            _state.value = UiState.Won(
+                                amount = doubled,
+                                cards = updatedCards,
+                                playWinnerSound = true
+                            )
+                            saveGameStateIfPossible()
+                        }
                     } else {
                         // 1) сначала только переворот карты
                         _state.value = st.copy(

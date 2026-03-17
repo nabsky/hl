@@ -115,7 +115,27 @@ fun MainScreen(
     var tempDeckMode by remember(showDeckModeDialog, deckMode) { mutableStateOf(deckMode) }
     var tempRtpInput by remember(showDeckModeDialog, fixedRtpInput) { mutableStateOf(fixedRtpInput) }
 
-    val showTopTokens = remember(state) { state is UiState.AmountEntry || state is UiState.Ready || state is UiState.Playing || state is UiState.Won }
+    var showTopTokens by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state) {
+        when (state) {
+            UiState.Idle -> {
+                showTopTokens = false
+            }
+
+            is UiState.AmountEntry,
+            is UiState.Ready,
+            is UiState.Playing,
+            is UiState.Won -> {
+                showTopTokens = true
+            }
+
+            is UiState.Lost -> {
+                delay(1100)
+                showTopTokens = false
+            }
+        }
+    }
 
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -162,6 +182,45 @@ fun MainScreen(
                 showLoseText = false
                 showLoseDim = false
             }
+        }
+    }
+
+    var displayedForegroundLevel by remember { mutableStateOf(0) }
+
+    LaunchedEffect(state) {
+        when (val st = state) {
+            UiState.Idle,
+            is UiState.AmountEntry,
+            is UiState.Ready -> {
+                displayedForegroundLevel = 0
+            }
+
+            is UiState.Lost -> {
+                delay(1100)
+                displayedForegroundLevel = 0
+            }
+
+            is UiState.Playing -> {
+                if (st.showConfetti) {
+                    displayedForegroundLevel =
+                        foregroundLevelFromCards(st.cards, st.revealedCount)
+                }
+            }
+
+            is UiState.Won -> {
+                displayedForegroundLevel =
+                    foregroundLevelFromCards(st.cards, st.cards.size)
+            }
+        }
+    }
+
+    val foregroundRes = remember(displayedForegroundLevel) {
+        when (displayedForegroundLevel) {
+            1 -> R.drawable.fg_02
+            2 -> R.drawable.fg_03
+            3 -> R.drawable.fg_04
+            4 -> R.drawable.fg_05
+            else -> null
         }
     }
 
@@ -412,7 +471,7 @@ fun MainScreen(
                     .zIndex(5000f)
             )
             Text(
-                text = "RTP converges statistically. Play ≥25,000 games for a reliable estimate.",
+                text = "RTP converges statistically. Play ≥25,000 games (≈ 56–57 hours) for a reliable estimate.",
                 fontSize = 12.sp,
                 letterSpacing = 0.5.sp,
                 color = Color(0xFFFFD54A),
@@ -536,7 +595,16 @@ fun MainScreen(
             WinOverlay(isFixedRtpMode = isFixedRtpMode)
         }
 
-
+        if (foregroundRes != null) {
+            Image(
+                painter = painterResource(foregroundRes),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(1f),
+                contentScale = ContentScale.Crop
+            )
+        }
 
         val bottomOverlayText = remember(state, showLoseText) {
             when (val st = state) {
@@ -595,16 +663,11 @@ fun MainScreen(
         }
 
         fun confirmEmulatorDialog() {
-            val finalAmount = emulatorAmountField.text
+            val finalAmount = emulatorAmountInput
                 .filter { it.isDigit() }
                 .ifBlank { "100000" }
 
             emulatorAmountInput = finalAmount
-            emulatorAmountField = TextFieldValue(
-                text = finalAmount,
-                selection = TextRange(0, finalAmount.length)
-            )
-
             vm.setEmulatorInitialAmount(finalAmount, context)
 
             val amount = finalAmount.toLongOrNull()
@@ -813,26 +876,17 @@ fun MainScreen(
                         ) {
                             Text("Press any key to stop the emulator and continue manually.")
 
-                            SelectAllOutlinedTextField(
-                                value = emulatorAmountField,
-                                onValueChange = { newValue ->
-                                    val sanitized = newValue.text.filter { ch -> ch.isDigit() }.take(9)
-                                    emulatorAmountInput = sanitized
-                                    emulatorAmountField = newValue.copy(
-                                        text = sanitized,
-                                        selection = TextRange(
-                                            sanitized.length.coerceAtMost(newValue.selection.start),
-                                            sanitized.length.coerceAtMost(newValue.selection.end)
-                                        )
-                                    )
+                            OutlinedTextField(
+                                value = emulatorAmountInput,
+                                onValueChange = {
+                                    emulatorAmountInput = it.filter { ch -> ch.isDigit() }.take(9)
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 label = { Text("Initial amount") },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Number
-                                ),
-                                autoFocus = true
+                                )
                             )
                         }
                     }
@@ -881,19 +935,11 @@ fun MainScreen(
                         ) {
                             Text("Current version: $versionName")
 
-                            SelectAllOutlinedTextField(
-                                value = updateCodeField,
-                                onValueChange = { newValue ->
-                                    val sanitized = newValue.text.filter { ch -> ch.isDigit() }
-                                    updateCode = sanitized
+                            OutlinedTextField(
+                                value = updateCode,
+                                onValueChange = {
+                                    updateCode = it.filter { ch -> ch.isDigit() }
                                     updateStatus = ""
-                                    updateCodeField = newValue.copy(
-                                        text = sanitized,
-                                        selection = TextRange(
-                                            sanitized.length.coerceAtMost(newValue.selection.start),
-                                            sanitized.length.coerceAtMost(newValue.selection.end)
-                                        )
-                                    )
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 label = { Text("Update code") },
@@ -901,8 +947,7 @@ fun MainScreen(
                                 enabled = !updateInProgress,
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Number
-                                ),
-                                autoFocus = true
+                                )
                             )
 
                             if (updateInProgress) {
@@ -1745,8 +1790,6 @@ private fun SelectAllOutlinedTextField(
     autoFocus: Boolean = false
 ) {
     val focusRequester = remember { FocusRequester() }
-    var selectAllOnNextFocus by remember { mutableStateOf(autoFocus) }
-    var wasFocused by remember { mutableStateOf(false) }
 
     LaunchedEffect(autoFocus) {
         if (autoFocus) {
@@ -1757,26 +1800,27 @@ private fun SelectAllOutlinedTextField(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier
-            .focusRequester(focusRequester)
-            .onFocusChanged { state ->
-                val justFocused = state.isFocused && !wasFocused
-                wasFocused = state.isFocused
-
-                if (justFocused && selectAllOnNextFocus) {
-                    onValueChange(
-                        value.copy(selection = TextRange(0, value.text.length))
-                    )
-                    selectAllOnNextFocus = false
-                }
-
-                if (!state.isFocused) {
-                    selectAllOnNextFocus = true
-                }
-            },
+        modifier = modifier.focusRequester(focusRequester),
         label = label,
         singleLine = singleLine,
         enabled = enabled,
         keyboardOptions = keyboardOptions
     )
+}
+
+private fun foregroundLevelFromCards(cards: List<Card>, revealedCount: Int): Int {
+    if (revealedCount < 2) return 0
+
+    var successCount = 0
+
+    for (i in 1 until revealedCount) {
+        val prev = cards.getOrNull(i - 1) ?: break
+        val next = cards.getOrNull(i) ?: break
+
+        if (next.rank.value != prev.rank.value) {
+            successCount++
+        }
+    }
+
+    return successCount
 }
